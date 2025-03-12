@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Upload, File, FileText, Video, Link as LinkIcon, Plus, Search, Trash2, Filter, Download, Mic, Play, Clock, Pause, ChevronDown, ChevronUp } from 'lucide-react';
 import { format } from 'date-fns';
 import { KnowledgeItem, CallRecord } from '../types';
+import { jwtDecode } from 'jwt-decode';
+import apiClient from '../api/client';
 
 const KnowledgeBase: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -109,37 +111,101 @@ const KnowledgeBase: React.FC = () => {
     });
   };
   
+  // Function to get companyId from JWT
+  const getCompanyIdFromToken = () => {
+    const token = localStorage.getItem('jwtToken');
+    if (!token) {
+      console.log('No JWT token found in localStorage');
+      return null;
+    }
+    try {
+      const decoded: any = jwtDecode(token);
+      console.log('Decoded JWT:', decoded);
+      return decoded.companyId;
+    } catch (error) {
+      console.error('Failed to decode JWT:', error);
+      return null;
+    }
+  };
+
+  // Fetch documents from the backend
+  useEffect(() => {
+    const fetchDocuments = async () => {
+      try {
+        const companyId = getCompanyIdFromToken();
+        if (!companyId) {
+          throw new Error('Company ID not found');
+        }
+
+        const response = await apiClient.get('/documents', {
+          params: { companyId }
+        });
+        console.log('Response fetching documents:', response);
+        const documents = response.data.documents.map((doc: any) => ({
+          id: doc.id,
+          name: doc.name,
+          description: doc.description,
+          type: 'document',
+          fileUrl: doc.fileUrl,
+          uploadedAt: format(new Date(doc.uploadedAt), 'yyyy-MM-dd'),
+          uploadedBy: doc.uploadedBy,
+          tags: doc.tags,
+          usagePercentage: 0,
+          isPublic: true
+        }));
+        setKnowledgeItems(documents);
+      } catch (error) {
+        console.error('Error fetching documents:', error);
+      }
+    };
+
+    fetchDocuments();
+  }, []);
+
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsUploading(true);
     
     try {
-      // Handle file upload and get the URL
-      let fileUrl = '';
-      if (uploadType === 'link') {
-        fileUrl = uploadUrl;
-      } else if (uploadFile) {
-        fileUrl = await createFileUrl(uploadFile);
+      if (!uploadFile) {
+        throw new Error('No file selected');
       }
-      
-      // Create a new knowledge item
+
+      const companyId = getCompanyIdFromToken();
+      if (!companyId) {
+        throw new Error('Company ID not found');
+      }
+
+      console.log('Company ID:', companyId);
+
+      const formData = new FormData();
+      formData.append('file', uploadFile);
+      formData.append('name', uploadName);
+      formData.append('description', uploadDescription);
+      formData.append('tags', uploadTags);
+      formData.append('uploadedBy', 'Current User');
+      formData.append('companyId', companyId);
+
+      const response = await apiClient.post('/documents/upload', formData);
+
+      console.log('Upload result:', response.data);
+
       const newItem: KnowledgeItem = {
-        id: `kb-${Date.now()}`,
-        name: uploadName,
-        description: uploadDescription,
-        type: uploadType as 'document' | 'video' | 'link' | 'audio',
-        fileUrl,
+        id: response.data.document.id,
+        name: response.data.document.name,
+        description: response.data.document.description,
+        type: 'document',
+        fileUrl: response.data.document.fileUrl,
         uploadedAt: format(new Date(), 'yyyy-MM-dd'),
         uploadedBy: 'Current User',
-        tags: uploadTags.split(',').map(tag => tag.trim()).filter(tag => tag !== ''),
+        tags: response.data.document.tags,
         usagePercentage: 0,
         isPublic: true
       };
-      
-      // Add the new item to the state
+
       setKnowledgeItems(prevItems => [...prevItems, newItem]);
-      
+
       // Reset form and close modal
       setUploadName('');
       setUploadDescription('');
@@ -247,27 +313,54 @@ const KnowledgeBase: React.FC = () => {
         throw new Error('No file selected');
       }
 
+      const companyId = getCompanyIdFromToken();
+      if (!companyId) {
+        throw new Error('Company ID not found');
+      }
+
       const audioUrl = await createFileUrl(uploadFile);
       const duration = await getAudioDuration(uploadFile);
       
+      const formData = new FormData();
+      formData.append('file', uploadFile);
+      formData.append('contactId', uploadName);
+      formData.append('date', format(new Date(), 'yyyy-MM-dd'));
+      formData.append('duration', duration.toString());
+      formData.append('summary', uploadDescription);
+      formData.append('sentiment', 'neutral');
+      formData.append('tags', uploadTags);
+      formData.append('aiInsights', '');
+      formData.append('repId', 'current-user');
+      formData.append('companyId', companyId);
+
+      const response = await fetch('/api/call-recordings/upload', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to upload call recording');
+      }
+
+      const result = await response.json();
       const newCall: CallRecord = {
-        id: `call-${Date.now()}`,
-        contactId: uploadName,
-        date: format(new Date(), 'yyyy-MM-dd'),
-        duration,
-        recordingUrl: audioUrl,
-        transcriptUrl: processingOptions.transcription ? '' : null,
-        summary: uploadDescription,
-        sentiment: processingOptions.sentiment ? 'neutral' : null,
-        tags: uploadTags.split(',').map(tag => tag.trim()).filter(tag => tag !== ''),
-        aiInsights: processingOptions.insights ? ['Processing...'] : [],
-        repId: 'current-user',
-        companyId: 'current-company',
-        processingOptions: { ...processingOptions },
+        id: result.callRecording.id,
+        contactId: result.callRecording.contactId,
+        date: result.callRecording.date,
+        duration: result.callRecording.duration,
+        recordingUrl: result.callRecording.recordingUrl,
+        transcriptUrl: '',
+        summary: result.callRecording.summary,
+        sentiment: result.callRecording.sentiment,
+        tags: result.callRecording.tags,
+        aiInsights: result.callRecording.aiInsights,
+        repId: result.callRecording.repId,
+        companyId: result.callRecording.companyId,
+        processingOptions: { transcription: true, sentiment: true, insights: true },
         audioState: {
           isPlaying: false,
           currentTime: 0,
-          duration: duration || 0, // Initialize with the actual duration
+          duration: duration || 0,
           audioInstance: null,
           showPlayer: false,
           showTranscript: false
@@ -392,6 +485,7 @@ const KnowledgeBase: React.FC = () => {
     };
   }, []);
 
+  // Ensure the component returns a valid ReactNode
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
       <div className="mb-6">

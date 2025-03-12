@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Users, UserPlus, UserCheck, Clock, Brain, Zap, FileText, MessageSquare } from 'lucide-react';
 import { mockContacts, mockInsights, mockLearningMetrics } from '../data/mockData';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { Link } from 'react-router-dom';
+import jwtEncode from 'jwt-encode';
 
 const Dashboard: React.FC = () => {
   const activeContacts = mockContacts.filter(contact => contact.status === 'active').length;
@@ -24,6 +25,19 @@ const Dashboard: React.FC = () => {
   const recentContacts = [...mockContacts]
     .sort((a, b) => new Date(b.lastContact).getTime() - new Date(a.lastContact).getTime())
     .slice(0, 5);
+
+  // Function to create and store a JWT token
+  const createAndStoreJwtToken = () => {
+    const payload = { companyId: '67d18e2b319c11009f4f2a98' };
+    const secret = 'your-256-bit-secret'; // Use a dummy secret for encoding
+    const token = jwtEncode(payload, secret);
+    localStorage.setItem('jwtToken', token);
+  };
+
+  // Generate JWT token on component mount
+  useEffect(() => {
+    createAndStoreJwtToken();
+  }, []);
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
