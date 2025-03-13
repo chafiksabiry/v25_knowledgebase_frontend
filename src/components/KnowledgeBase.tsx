@@ -237,7 +237,7 @@ const KnowledgeBase: React.FC = () => {
       console.log('Upload result:', response.data);
 
       const newItem: KnowledgeItem = {
-        id: response.data.document._id,
+        id: response.data.document.id,
         name: response.data.document.name,
         description: response.data.document.description,
         type: 'document',
@@ -404,7 +404,7 @@ const KnowledgeBase: React.FC = () => {
       console.log('Upload result:', response.data);
 
       const newCall: CallRecord = {
-        id: response.data.callRecording._id,
+        id: response.data.callRecording.id,
         contactId: response.data.callRecording.contactId,
         date: response.data.callRecording.date,
         duration: response.data.callRecording.duration,
