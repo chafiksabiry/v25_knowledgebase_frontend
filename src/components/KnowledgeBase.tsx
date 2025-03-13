@@ -142,11 +142,11 @@ const KnowledgeBase: React.FC = () => {
         });
         console.log('Response fetching documents:', response);
         const documents = response.data.documents.map((doc: any) => ({
-          id: doc.id,
+          id: doc._id,
           name: doc.name,
           description: doc.description,
           type: 'document',
-          fileUrl: doc.fileUrl,
+          fileUrl: `${import.meta.env.VITE_BACKEND_API}${doc.fileUrl}`,
           uploadedAt: format(new Date(doc.uploadedAt), 'yyyy-MM-dd'),
           uploadedBy: doc.uploadedBy,
           tags: doc.tags,
@@ -160,6 +160,51 @@ const KnowledgeBase: React.FC = () => {
     };
 
     fetchDocuments();
+  }, []);
+
+  // Fetch call records from the backend
+  useEffect(() => {
+    const fetchCallRecords = async () => {
+      try {
+        const companyId = getCompanyIdFromToken();
+        if (!companyId) {
+          throw new Error('Company ID not found');
+        }
+
+        const response = await apiClient.get('/call-recordings', {
+          params: { companyId }
+        });
+        console.log('Response fetching call records:', response);
+        const calls = response.data.callRecordings.map((call: any) => ({
+          id: call.id,
+          contactId: call.contactId,
+          date: call.date,
+          duration: call.duration,
+          recordingUrl: `${import.meta.env.VITE_BACKEND_API}${call.recordingUrl}`,
+          transcriptUrl: '',
+          summary: call.summary,
+          sentiment: call.sentiment,
+          tags: call.tags,
+          aiInsights: call.aiInsights,
+          repId: call.repId,
+          companyId: call.companyId,
+          processingOptions: { transcription: true, sentiment: true, insights: true },
+          audioState: {
+            isPlaying: false,
+            currentTime: 0,
+            duration: call.duration || 0,
+            audioInstance: null,
+            showPlayer: false,
+            showTranscript: false
+          }
+        }));
+        setCallRecords(calls);
+      } catch (error) {
+        console.error('Error fetching call records:', error);
+      }
+    };
+
+    fetchCallRecords();
   }, []);
 
   // Handle form submission
@@ -192,11 +237,11 @@ const KnowledgeBase: React.FC = () => {
       console.log('Upload result:', response.data);
 
       const newItem: KnowledgeItem = {
-        id: response.data.document.id,
+        id: response.data.document._id,
         name: response.data.document.name,
         description: response.data.document.description,
         type: 'document',
-        fileUrl: response.data.document.fileUrl,
+        fileUrl: `${import.meta.env.VITE_BACKEND_API}${response.data.document.fileUrl}`,
         uploadedAt: format(new Date(), 'yyyy-MM-dd'),
         uploadedBy: 'Current User',
         tags: response.data.document.tags,
@@ -222,24 +267,50 @@ const KnowledgeBase: React.FC = () => {
   };
   
   // Handle item deletion with improved cleanup
-  const handleDelete = (id: string) => {
-    if (activeTab === 'documents') {
-      setKnowledgeItems(prevItems => {
-        const item = prevItems.find(item => item.id === id);
-        if (item && item.type !== 'link' && item.fileUrl) {
-          URL.revokeObjectURL(item.fileUrl);
+  const handleDelete = async (id: string) => {
+    console.log('Attempting to delete item with ID:', id);
+    console.log('Active tab:', activeTab);
+    
+    try {
+      if (activeTab === 'documents') {
+        // Log the item being deleted
+        const itemToDelete = knowledgeItems.find(item => item.id === id);
+        console.log('Document being deleted:', itemToDelete);
+        
+        await apiClient.delete(`/documents/${id}`);
+        setKnowledgeItems(prevItems => prevItems.filter(item => item.id !== id));
+      } else {
+        // Log the call being deleted
+        const callToDelete = callRecords.find(call => call.id === id);
+        console.log('Call recording being deleted:', callToDelete);
+        
+        // Delete call recording from the backend
+        await apiClient.delete(`/call-recordings/${id}`);
+        
+        // Clean up audio resources and update state
+        setCallRecords(prevCalls => {
+          const call = prevCalls.find(call => call.id === id);
+          if (call) {
+            cleanupAudioResources(call);
+          }
+          return prevCalls.filter(call => call.id !== id);
+        });
+        
+        // If this call was playing, stop it and reset audio state
+        if (playingCallId === id) {
+          if (currentAudio) {
+            currentAudio.pause();
+          }
+          setCurrentAudio(null);
+          setIsPlaying(false);
+          setPlayingCallId(null);
+          setCurrentTime(0);
+          setDuration(0);
         }
-        return prevItems.filter(item => item.id !== id);
-      });
-    } else {
-      setCallRecords(prevCalls => {
-        const call = prevCalls.find(call => call.id === id);
-        if (call) {
-          // Clean up audio resources
-          cleanupAudioResources(call);
-        }
-        return prevCalls.filter(call => call.id !== id);
-      });
+      }
+    } catch (error) {
+      console.error('Error deleting item:', error);
+      alert('There was an error deleting the item. Please try again.');
     }
   };
 
@@ -282,13 +353,8 @@ const KnowledgeBase: React.FC = () => {
       return;
     }
 
-    // For files, create a temporary anchor and trigger download
-    const link = document.createElement('a');
-    link.href = item.fileUrl;
-    link.download = item.name;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    // Open the file URL in a new tab
+    window.open(item.fileUrl, '_blank');
   };
 
   // Add this new function near the other handlers
@@ -333,29 +399,23 @@ const KnowledgeBase: React.FC = () => {
       formData.append('repId', 'current-user');
       formData.append('companyId', companyId);
 
-      const response = await fetch('/api/call-recordings/upload', {
-        method: 'POST',
-        body: formData
-      });
+      const response = await apiClient.post('/call-recordings/upload', formData);
 
-      if (!response.ok) {
-        throw new Error('Failed to upload call recording');
-      }
+      console.log('Upload result:', response.data);
 
-      const result = await response.json();
       const newCall: CallRecord = {
-        id: result.callRecording.id,
-        contactId: result.callRecording.contactId,
-        date: result.callRecording.date,
-        duration: result.callRecording.duration,
-        recordingUrl: result.callRecording.recordingUrl,
+        id: response.data.callRecording._id,
+        contactId: response.data.callRecording.contactId,
+        date: response.data.callRecording.date,
+        duration: response.data.callRecording.duration,
+        recordingUrl: `${import.meta.env.VITE_BACKEND_API}${response.data.callRecording.recordingUrl}`,
         transcriptUrl: '',
-        summary: result.callRecording.summary,
-        sentiment: result.callRecording.sentiment,
-        tags: result.callRecording.tags,
-        aiInsights: result.callRecording.aiInsights,
-        repId: result.callRecording.repId,
-        companyId: result.callRecording.companyId,
+        summary: response.data.callRecording.summary,
+        sentiment: response.data.callRecording.sentiment,
+        tags: response.data.callRecording.tags,
+        aiInsights: response.data.callRecording.aiInsights,
+        repId: response.data.callRecording.repId,
+        companyId: response.data.callRecording.companyId,
         processingOptions: { transcription: true, sentiment: true, insights: true },
         audioState: {
           isPlaying: false,
@@ -385,6 +445,7 @@ const KnowledgeBase: React.FC = () => {
 
   // Handle audio playback
   const handlePlayRecording = (recordingUrl: string, callId: string) => {
+    console.log('Attempting to play audio:', recordingUrl); // Debugging log
     // First pause any currently playing audio
     if (currentAudio) {
       currentAudio.pause();
@@ -590,7 +651,7 @@ const KnowledgeBase: React.FC = () => {
                     <div className="flex flex-wrap gap-1 mb-3">
                       {item.tags.map((tag: string, index: number) => (
                         <span 
-                          key={index}
+                          key={`${item.id}-${tag}`}
                           className="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-700 whitespace-nowrap"
                         >
                           {tag}
@@ -696,7 +757,7 @@ const KnowledgeBase: React.FC = () => {
                     <div className="flex flex-wrap gap-1 mb-3">
                       {call.tags.map((tag: string, index: number) => (
                         <span 
-                          key={index}
+                          key={`${call.id}-${tag}`}
                           className="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-700 whitespace-nowrap"
                         >
                           {tag}
