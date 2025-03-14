@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, File, FileText, Video, Link as LinkIcon, Plus, Search, Trash2, Filter, Download, Mic, Play, Clock, Pause, ChevronDown, ChevronUp } from 'lucide-react';
+import { Upload, File, FileText, Video, Link as LinkIcon, Plus, Search, Trash2, Filter, Download, Mic, Play, Clock, Pause, ChevronDown, ChevronUp, X, ExternalLink, Eye } from 'lucide-react';
 import { format } from 'date-fns';
 import { KnowledgeItem, CallRecord } from '../types';
 import { jwtDecode } from 'jwt-decode';
@@ -35,6 +35,8 @@ const KnowledgeBase: React.FC = () => {
     sentiment: true,
     insights: true
   });
+  const [selectedItem, setSelectedItem] = useState<any | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   
   // Load items from localStorage on mount
   useEffect(() => {
@@ -346,15 +348,15 @@ const KnowledgeBase: React.FC = () => {
     }
   };
 
-  // Handle file download
-  const handleDownload = (item: KnowledgeItem) => {
-    if (item.type === 'link') {
-      window.open(item.fileUrl, '_blank');
-      return;
-    }
+  // Replace handleDownload with handleView
+  const handleView = (item: any) => {
+    setSelectedItem(item);
+    setIsModalOpen(true);
+  };
 
-    // Open the file URL in a new tab
-    window.open(item.fileUrl, '_blank');
+  // Add function to open document/recording in new tab
+  const openInNewTab = (url: string) => {
+    window.open(url, '_blank');
   };
 
   // Add this new function near the other handlers
@@ -671,14 +673,16 @@ const KnowledgeBase: React.FC = () => {
                       
                       <div className="flex space-x-2 flex-shrink-0">
                         <button 
-                          onClick={() => handleDownload(item)}
+                          onClick={() => handleView(item)}
                           className="text-blue-600 hover:text-blue-800 p-1"
+                          title="View details"
                         >
-                          <Download size={16} />
+                          <Eye size={16} />
                         </button>
                         <button 
                           className="text-red-600 hover:text-red-800 p-1"
                           onClick={() => handleDelete(item.id)}
+                          title="Delete"
                         >
                           <Trash2 size={16} />
                         </button>
@@ -738,7 +742,14 @@ const KnowledgeBase: React.FC = () => {
                           </span>
                         )}
                         <button 
-                          className="text-red-600 hover:text-red-800 p-1 flex-shrink-0"
+                          onClick={() => handleView(call)}
+                          className="text-blue-600 hover:text-blue-800 p-1"
+                          title="View details"
+                        >
+                          <Eye size={16} />
+                        </button>
+                        <button 
+                          className="text-red-600 hover:text-red-800 p-1"
                           onClick={() => handleDelete(call.id)}
                           title="Delete call recording"
                         >
@@ -1224,6 +1235,159 @@ const KnowledgeBase: React.FC = () => {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Modal for Document/Call Recording Details */}
+      {isModalOpen && selectedItem && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-start mb-4">
+                <div className="flex items-center">
+                  {activeTab === 'documents' ? getItemIcon(selectedItem.type) : <Mic size={20} className="text-purple-500" />}
+                  <h3 className="text-xl font-semibold ml-2">
+                    {activeTab === 'documents' ? 'Document Details' : 'Call Recording Details'}
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setIsModalOpen(false)}
+                  className="text-gray-400 hover:text-gray-500"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {activeTab === 'documents' ? (
+                  <>
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Name</label>
+                      <p className="text-gray-900">{selectedItem.name}</p>
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Description</label>
+                      <p className="text-gray-900">{selectedItem.description}</p>
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Type</label>
+                      <p className="text-gray-900 capitalize">{selectedItem.type}</p>
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Upload Date</label>
+                      <p className="text-gray-900">
+                        {format(new Date(selectedItem.uploadedAt), 'MMMM d, yyyy')}
+                      </p>
+                    </div>
+
+                    {selectedItem.tags && selectedItem.tags.length > 0 && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-500">Tags</label>
+                        <div className="flex flex-wrap gap-2 mt-1">
+                          {selectedItem.tags.map((tag: string, index: number) => (
+                            <span 
+                              key={index}
+                              className="px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-sm"
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="pt-4">
+                      <button
+                        onClick={() => openInNewTab(selectedItem.fileUrl)}
+                        className="w-full flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                      >
+                        <ExternalLink size={18} className="mr-2" />
+                        Open Document
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Contact ID</label>
+                      <p className="text-gray-900">{selectedItem.contactId}</p>
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Summary</label>
+                      <p className="text-gray-900">{selectedItem.summary}</p>
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Date & Duration</label>
+                      <div className="flex items-center text-gray-900">
+                        <Clock size={16} className="mr-2" />
+                        {selectedItem.date} • {selectedItem.duration} minutes
+                      </div>
+                    </div>
+
+                    {selectedItem.sentiment && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-500">Sentiment</label>
+                        <span className={`mt-1 px-2 py-1 inline-flex text-sm rounded-full ${
+                          selectedItem.sentiment === 'positive' ? 'bg-green-100 text-green-800' : 
+                          selectedItem.sentiment === 'negative' ? 'bg-red-100 text-red-800' : 
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {selectedItem.sentiment.charAt(0).toUpperCase() + selectedItem.sentiment.slice(1)}
+                        </span>
+                      </div>
+                    )}
+
+                    {selectedItem.tags && selectedItem.tags.length > 0 && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-500">Tags</label>
+                        <div className="flex flex-wrap gap-2 mt-1">
+                          {selectedItem.tags.map((tag: string, index: number) => (
+                            <span 
+                              key={index}
+                              className="px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-sm"
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {selectedItem.aiInsights && selectedItem.aiInsights.length > 0 && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-500">AI Insights</label>
+                        <div className="mt-1 p-3 bg-gray-50 rounded-lg">
+                          <ul className="space-y-2 text-sm text-gray-700">
+                            {selectedItem.aiInsights.map((insight: string, index: number) => (
+                              <li key={index} className="flex items-start">
+                                <span className="mr-2">•</span>
+                                <span>{insight}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="pt-4">
+                      <button
+                        onClick={() => openInNewTab(selectedItem.recordingUrl)}
+                        className="w-full flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                      >
+                        <ExternalLink size={18} className="mr-2" />
+                        Open Recording
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>
