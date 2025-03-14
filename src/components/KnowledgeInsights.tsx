@@ -79,11 +79,15 @@ const KnowledgeInsights: React.FC = () => {
 
         if (analysisResponse.data.analyses && analysisResponse.data.analyses.length > 0) {
           const latestAnalysis = analysisResponse.data.analyses[0];
-          setAnalysis(latestAnalysis);
-          setAnalysisStatus(latestAnalysis.status);
           
-          // Start new analysis if no analysis exists or if last analysis failed
-          if (!latestAnalysis || latestAnalysis.status === 'failed') {
+          // Check if analysis is still valid
+          const isAnalysisValid = validateAnalysis(latestAnalysis, documents);
+          
+          if (isAnalysisValid) {
+            setAnalysis(latestAnalysis);
+            setAnalysisStatus(latestAnalysis.status);
+          } else {
+            // Analysis is outdated, start a new one
             await startNewAnalysis();
           }
         } else {
@@ -102,7 +106,37 @@ const KnowledgeInsights: React.FC = () => {
     fetchData();
   }, []);
 
-  // Start new analysis
+  // Add validation function for analysis
+  const validateAnalysis = (analysis: any, currentDocuments: any[]) => {
+    if (!analysis) return false;
+
+    // Check if analysis is completed
+    if (analysis.status !== 'completed') return false;
+
+    // Check if the document count matches
+    const analysisDocCount = analysis.metrics?.documentCount || 0;
+    if (analysisDocCount !== currentDocuments.length) return false;
+
+    // Check if analysis is not too old (e.g., more than 24 hours)
+    const analysisDate = new Date(analysis.createdAt || analysis.updatedAt);
+    const now = new Date();
+    const hoursSinceAnalysis = (now.getTime() - analysisDate.getTime()) / (1000 * 60 * 60);
+    if (hoursSinceAnalysis > 24) return false;
+
+    // Check if all current documents are included in the analysis
+    const analysisDocIds = new Set(analysis.analyzedDocuments || []);
+    const currentDocIds = new Set(currentDocuments.map(doc => doc.id));
+    
+    // Check if the sets have the same size and all current documents are in the analysis
+    if (analysisDocIds.size !== currentDocIds.size) return false;
+    for (const docId of currentDocIds) {
+      if (!analysisDocIds.has(docId)) return false;
+    }
+
+    return true;
+  };
+
+  // Update startNewAnalysis to include current document IDs
   const startNewAnalysis = async () => {
     try {
       const companyId = getCompanyIdFromToken();
@@ -114,7 +148,8 @@ const KnowledgeInsights: React.FC = () => {
       setAnalysisStatus('processing');
       
       const response = await apiClient.post('/analysis/knowledge-base', {
-        companyId
+        companyId,
+        documentIds: knowledgeBase.map(doc => doc.id) // Include current document IDs
       });
 
       // Poll for analysis completion
