@@ -62,7 +62,7 @@ const KnowledgeInsights: React.FC = () => {
           name: doc.name,
           description: doc.description,
           type: doc.type || 'document',
-          fileUrl: `${import.meta.env.VITE_BACKEND_API}${doc.fileUrl}`,
+          fileUrl: doc.fileUrl,
           uploadedAt: doc.uploadedAt,
           uploadedBy: doc.uploadedBy,
           tags: doc.tags,
