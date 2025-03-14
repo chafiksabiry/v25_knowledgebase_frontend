@@ -359,8 +359,8 @@ const KnowledgeBase: React.FC = () => {
     window.open(url, '_blank');
   };
 
-  // Add this new function near the other handlers
-  const handleModalClose = () => {
+  // Handle upload modal close
+  const handleUploadModalClose = () => {
     if (!isUploading) {
       setShowUploadModal(false);
       setUploadName('');
@@ -369,6 +369,19 @@ const KnowledgeBase: React.FC = () => {
       setUploadFile(null);
       setUploadTags('');
     }
+  };
+
+  // Handle details modal close
+  const handleDetailsModalClose = () => {
+    // Stop audio playback if it's playing
+    if (currentAudio) {
+      currentAudio.pause();
+      setIsPlaying(false);
+      setCurrentTime(0);
+      setPlayingCallId(null);
+    }
+    setIsModalOpen(false);
+    setSelectedItem(null);
   };
 
   // Handle call recording submission
@@ -901,7 +914,7 @@ const KnowledgeBase: React.FC = () => {
               <button
                 type="button"
                 className="text-gray-400 hover:text-gray-500 focus:outline-none text-xl font-semibold"
-                onClick={handleModalClose}
+                onClick={handleUploadModalClose}
                 disabled={isUploading}
               >
                 ×
@@ -1211,7 +1224,7 @@ const KnowledgeBase: React.FC = () => {
                   <button
                     type="button"
                     className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-lg"
-                    onClick={handleModalClose}
+                    onClick={handleUploadModalClose}
                     disabled={isUploading}
                   >
                     Cancel
@@ -1253,7 +1266,7 @@ const KnowledgeBase: React.FC = () => {
                   </h3>
                 </div>
                 <button
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={handleDetailsModalClose}
                   className="text-gray-400 hover:text-gray-500"
                 >
                   <X size={24} />
@@ -1314,12 +1327,12 @@ const KnowledgeBase: React.FC = () => {
                 ) : (
                   <>
                     <div>
-                      <label className="text-sm font-medium text-gray-500">Contact ID</label>
+                      <label className="text-sm font-medium text-gray-500">Name</label>
                       <p className="text-gray-900">{selectedItem.contactId}</p>
                     </div>
 
                     <div>
-                      <label className="text-sm font-medium text-gray-500">Summary</label>
+                      <label className="text-sm font-medium text-gray-500">Description</label>
                       <p className="text-gray-900">{selectedItem.summary}</p>
                     </div>
 
@@ -1327,22 +1340,9 @@ const KnowledgeBase: React.FC = () => {
                       <label className="text-sm font-medium text-gray-500">Date & Duration</label>
                       <div className="flex items-center text-gray-900">
                         <Clock size={16} className="mr-2" />
-                        {selectedItem.date} • {selectedItem.duration} minutes
+                        {format(new Date(selectedItem.date), 'MMM d, yyyy')} • {selectedItem.duration} minutes
                       </div>
                     </div>
-
-                    {selectedItem.sentiment && (
-                      <div>
-                        <label className="text-sm font-medium text-gray-500">Sentiment</label>
-                        <span className={`mt-1 px-2 py-1 inline-flex text-sm rounded-full ${
-                          selectedItem.sentiment === 'positive' ? 'bg-green-100 text-green-800' : 
-                          selectedItem.sentiment === 'negative' ? 'bg-red-100 text-red-800' : 
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {selectedItem.sentiment.charAt(0).toUpperCase() + selectedItem.sentiment.slice(1)}
-                        </span>
-                      </div>
-                    )}
 
                     {selectedItem.tags && selectedItem.tags.length > 0 && (
                       <div>
@@ -1376,15 +1376,63 @@ const KnowledgeBase: React.FC = () => {
                       </div>
                     )}
 
-                    <div className="pt-4">
-                      <button
-                        onClick={() => openInNewTab(selectedItem.recordingUrl)}
-                        className="w-full flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                      >
-                        <ExternalLink size={18} className="mr-2" />
-                        Open Recording
-                      </button>
+                    {/* Audio Player */}
+                    <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <button 
+                          className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors flex-shrink-0"
+                          onClick={() => handlePlayRecording(selectedItem.recordingUrl, selectedItem.id)}
+                          title={playingCallId === selectedItem.id && isPlaying ? "Pause" : "Play"}
+                        >
+                          {playingCallId === selectedItem.id && isPlaying ? (
+                            <Pause size={16} />
+                          ) : (
+                            <Play size={16} />
+                          )}
+                        </button>
+
+                        <div className="flex-1 flex items-center space-x-2 min-w-0">
+                          <div className="relative flex-1 h-1.5 bg-gray-200 rounded-full">
+                            <input
+                              type="range"
+                              min="0"
+                              max={duration || 100}
+                              value={playingCallId === selectedItem.id ? currentTime : 0}
+                              onChange={(e) => handleTimeChange(Number(e.target.value))}
+                              className="absolute w-full h-full opacity-0 cursor-pointer"
+                              disabled={!duration}
+                              title="Seek"
+                            />
+                            <div 
+                              className="absolute h-full bg-blue-600 rounded-full"
+                              style={{ 
+                                width: `${duration ? 
+                                  (playingCallId === selectedItem.id ? (currentTime / duration) * 100 : 0) : 0}%` 
+                              }}
+                            />
+                          </div>
+                          <span className="text-xs text-gray-500 min-w-[70px] text-right flex-shrink-0">
+                            {playingCallId === selectedItem.id ? `${formatTime(currentTime)} / ${formatTime(duration)}` : '0:00 / 0:00'}
+                          </span>
+                        </div>
+                      </div>
                     </div>
+
+                    {/* Sentiment at the bottom */}
+                    {selectedItem.sentiment && (
+                      <div className="mt-4">
+                        <label className="text-sm font-medium text-gray-500">Sentiment</label>
+                        <div className="mt-1">
+                          <span className={`px-3 py-1.5 inline-flex text-sm rounded-full ${
+                            selectedItem.sentiment === 'positive' ? 'bg-green-100 text-green-800' : 
+                            selectedItem.sentiment === 'negative' ? 'bg-red-100 text-red-800' : 
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {selectedItem.sentiment.charAt(0).toUpperCase() + selectedItem.sentiment.slice(1)} Sentiment
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </>
                 )}
               </div>
