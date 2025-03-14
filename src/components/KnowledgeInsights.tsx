@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Brain, FileText, Video, Link as LinkIcon, BarChart2, TrendingUp, Search } from 'lucide-react';
+import { Brain, FileText, Video, Link as LinkIcon, BarChart2, TrendingUp, Search, X, ExternalLink } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import apiClient from '../api/client';
 import { jwtDecode } from 'jwt-decode';
@@ -10,6 +10,8 @@ const KnowledgeInsights: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [knowledgeBase, setKnowledgeBase] = useState<any[]>([]);
   const [analysis, setAnalysis] = useState<any | null>(null);
+  const [selectedDocument, setSelectedDocument] = useState<any | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   type AnalysisStatus = 'idle' | 'processing' | 'completed' | 'failed';
   const [analysisStatus, setAnalysisStatus] = useState<AnalysisStatus>('idle');
   
@@ -184,6 +186,17 @@ const KnowledgeInsights: React.FC = () => {
       default:
         return 'bg-purple-50';
     }
+  };
+
+  // Function to handle document view
+  const handleViewDocument = (document: any) => {
+    setSelectedDocument(document);
+    setIsModalOpen(true);
+  };
+
+  // Function to open document in new tab
+  const openDocumentInNewTab = (fileUrl: string) => {
+    window.open(fileUrl, '_blank');
   };
 
   if (loading) {
@@ -502,7 +515,12 @@ const KnowledgeInsights: React.FC = () => {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <button className="text-blue-600 hover:text-blue-900">View</button>
+                    <button 
+                      onClick={() => handleViewDocument(resource)}
+                      className="text-blue-600 hover:text-blue-900"
+                    >
+                      View
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -510,6 +528,93 @@ const KnowledgeInsights: React.FC = () => {
           </table>
         </div>
       </div>
+
+      {/* Document Details Modal */}
+      {isModalOpen && selectedDocument && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-start mb-4">
+                <div className="flex items-center">
+                  {getResourceIcon(selectedDocument.type)}
+                  <h3 className="text-xl font-semibold ml-2">Document Details</h3>
+                </div>
+                <button
+                  onClick={() => setIsModalOpen(false)}
+                  className="text-gray-400 hover:text-gray-500"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Name</label>
+                  <p className="text-gray-900">{selectedDocument.name}</p>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Description</label>
+                  <p className="text-gray-900">{selectedDocument.description}</p>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Type</label>
+                  <p className="text-gray-900 capitalize">{selectedDocument.type}</p>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Upload Date</label>
+                  <p className="text-gray-900">
+                    {format(parseISO(selectedDocument.uploadedAt), 'MMMM d, yyyy')}
+                  </p>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Usage</label>
+                  <div className="flex items-center mt-1">
+                    <div className="w-full bg-gray-200 rounded-full h-2.5">
+                      <div 
+                        className="bg-blue-600 h-2.5 rounded-full" 
+                        style={{ width: `${selectedDocument.usagePercentage}%` }}
+                      ></div>
+                    </div>
+                    <span className="ml-2 text-sm text-gray-500">
+                      {selectedDocument.usagePercentage}%
+                    </span>
+                  </div>
+                </div>
+
+                {selectedDocument.tags && selectedDocument.tags.length > 0 && (
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Tags</label>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {selectedDocument.tags.map((tag: string, index: number) => (
+                        <span 
+                          key={index}
+                          className="px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-sm"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="pt-4">
+                  <button
+                    onClick={() => openDocumentInNewTab(selectedDocument.fileUrl)}
+                    className="w-full flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    <ExternalLink size={18} className="mr-2" />
+                    Open Document
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
