@@ -62,6 +62,11 @@ const KnowledgeInsights: React.FC = () => {
     }
   };
 
+  // Add debounce mechanism
+  const [isRequestInProgress, setIsRequestInProgress] = useState(false);
+  const [lastRequestTime, setLastRequestTime] = useState(0);
+  const MIN_REQUEST_INTERVAL = 10000; // 10 seconds between requests
+
   // Function to check analysis status
   const checkAnalysisStatus = async (companyId: string) => {
     try {
@@ -108,6 +113,8 @@ const KnowledgeInsights: React.FC = () => {
   // Helper function to start new analysis
   const startNewAnalysis = async (companyId: string) => {
     try {
+      // Prevent duplicate requests
+      setIsRequestInProgress(true);
       console.log('🚀 Starting new analysis for company:', companyId);
       
       // Clear any previous errors and set status to in_progress
@@ -138,6 +145,9 @@ const KnowledgeInsights: React.FC = () => {
           error: null
         });
       }
+      
+      // Update last request time
+      setLastRequestTime(Date.now());
     } catch (error: any) {
       console.error('❌ Analysis error:', error);
       
@@ -152,6 +162,8 @@ const KnowledgeInsights: React.FC = () => {
           'Rate limit exceeded. Please wait a few minutes before trying again.' :
           `Failed to start analysis: ${errorMessage}`
       }));
+    } finally {
+      setIsRequestInProgress(false);
     }
   };
 
@@ -218,9 +230,20 @@ const KnowledgeInsights: React.FC = () => {
             startPolling(companyId);
           }
         } else {
-          // No analysis exists, start a new one
-          console.log('ℹ️ No existing analysis found, starting new analysis');
-          await startNewAnalysis(companyId);
+          // No analysis exists, check if we should auto-start one 
+          console.log('ℹ️ No existing analysis found');
+          
+          // Don't auto-start analysis on initial load to prevent multiple requests
+          // User can manually start analysis if needed
+          setAnalysis({
+            status: 'idle',
+            progress: 0,
+            results: null,
+            error: null
+          });
+          
+          // Set this for reference
+          setLastRequestTime(Date.now() - MIN_REQUEST_INTERVAL);
         }
 
         setLoading(false);
@@ -254,6 +277,24 @@ const KnowledgeInsights: React.FC = () => {
       
       if (!companyId) {
         throw new Error('Company ID not found');
+      }
+
+      // Prevent duplicate requests
+      if (isRequestInProgress) {
+        console.log('⚠️ Request already in progress, ignoring click');
+        return;
+      }
+
+      // Check if we're within the rate limit window
+      const now = Date.now();
+      const timeSinceLastRequest = now - lastRequestTime;
+      if (timeSinceLastRequest < MIN_REQUEST_INTERVAL) {
+        console.log(`⚠️ Rate limiting in effect. Please wait ${Math.ceil((MIN_REQUEST_INTERVAL - timeSinceLastRequest) / 1000)} seconds before trying again`);
+        setAnalysis(prev => ({
+          ...prev,
+          error: `Please wait ${Math.ceil((MIN_REQUEST_INTERVAL - timeSinceLastRequest) / 1000)} seconds between analysis requests to avoid rate limits.`
+        }));
+        return;
       }
 
       console.log('🔄 Starting manual reanalysis for company:', companyId);
@@ -467,11 +508,21 @@ const KnowledgeInsights: React.FC = () => {
           </div>
           <button
             onClick={startAnalysis}
-            disabled={analysis.status === ('in_progress' as AnalysisStatus)}
+            disabled={analysis.status === ('in_progress' as AnalysisStatus) || isRequestInProgress}
             className="flex items-center space-x-2 px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title={isRequestInProgress ? "Request in progress..." : ""}
           >
-            <Brain size={16} />
-            <span>{analysis.results ? 'Reanalyze' : 'Start Analysis'}</span>
+            {isRequestInProgress ? (
+              <>
+                <div className="animate-spin h-4 w-4 border-b-2 border-purple-700 rounded-full mr-2"></div>
+                <span>Processing...</span>
+              </>
+            ) : (
+              <>
+                <Brain size={16} />
+                <span>{analysis.results ? 'Reanalyze' : 'Start Analysis'}</span>
+              </>
+            )}
           </button>
         </div>
         
