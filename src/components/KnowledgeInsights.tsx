@@ -5,11 +5,60 @@ import apiClient from '../api/client';
 import { jwtDecode } from 'jwt-decode';
 import axios from 'axios';
 
+// New structured format interfaces
+interface TopicAnalysis {
+  summary: string;
+  mainTopics: Array<{
+    topic: string;
+    description: string;
+    relatedDocuments: Array<{
+      id?: string;
+      name: string;
+      relevance: string;
+    }>;
+  }>;
+}
+
+interface KnowledgeGaps {
+  summary: string;
+  gaps: Array<{
+    gap: string;
+    impact: string;
+    affectedAreas: string[];
+    relatedDocuments: Array<{
+      id?: string;
+      name: string;
+      context: string;
+    }>;
+  }>;
+}
+
+interface RecommendationsPriorities {
+  summary: string;
+  priorities: Array<{
+    recommendation: string;
+    priority: 'HIGH' | 'MEDIUM' | 'LOW';
+    rationale: string;
+    implementation: string;
+    relatedGaps: string[];
+    affectedDocuments: Array<{
+      id?: string;
+      name: string;
+    }>;
+  }>;
+}
+
+// Combined interface that can handle both formats
 interface AnalysisResults {
-  topics: string;
-  gaps: string;
-  relationships: string;
-  recommendations: string;
+  // New structured format
+  topicAnalysis?: TopicAnalysis;
+  knowledgeGaps?: KnowledgeGaps;
+  recommendations?: RecommendationsPriorities | string;
+
+  // Legacy format fields
+  topics?: string;
+  gaps?: string;
+  relationships?: string;
 }
 
 type AnalysisStatus = 'idle' | 'started' | 'in_progress' | 'completed' | 'failed';
@@ -376,41 +425,200 @@ const KnowledgeInsights: React.FC = () => {
   const renderResults = () => {
     if (!analysis.results) return null;
 
-    return (
-      <div className="space-y-8">
-        {/* Topics Analysis */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-2xl font-bold mb-4">Topics Analysis</h2>
-          <div className="prose max-w-none">
-            {analysis.results.topics}
-          </div>
-        </div>
+    // Check if we have structured data or legacy format
+    const hasStructuredFormat = analysis.results.topicAnalysis !== undefined || 
+                               analysis.results.knowledgeGaps !== undefined || 
+                               (analysis.results.recommendations !== undefined && 
+                                typeof analysis.results.recommendations !== 'string');
 
-        {/* Knowledge Gaps */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-2xl font-bold mb-4">Knowledge Gaps</h2>
-          <div className="prose max-w-none">
-            {analysis.results.gaps}
-          </div>
-        </div>
+    if (hasStructuredFormat) {
+      return (
+        <div className="space-y-8">
+          {/* Topics Analysis */}
+          {analysis.results.topicAnalysis && (
+            <div className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-2xl font-bold mb-4">Topics Analysis</h2>
+              
+              <div className="prose max-w-none">
+                <p className="text-lg text-gray-700 mb-6">{analysis.results.topicAnalysis.summary}</p>
+                
+                <h3 className="text-xl font-semibold mb-3">Main Topics</h3>
+                
+                <div className="space-y-6">
+                  {analysis.results.topicAnalysis.mainTopics.map((topic, i) => (
+                    <div key={i} className="bg-blue-50 p-4 rounded-lg">
+                      <h4 className="font-bold text-lg text-blue-800">{topic.topic}</h4>
+                      <p className="my-2">{topic.description}</p>
+                      
+                      {topic.relatedDocuments.length > 0 && (
+                        <div className="mt-3">
+                          <p className="font-medium text-sm">Related Documents:</p>
+                          <ul className="list-disc pl-5 mt-1">
+                            {topic.relatedDocuments.map((doc, j) => (
+                              <li key={j} className="text-sm">
+                                <span className="font-medium">{doc.name}:</span> {doc.relevance}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
 
-        {/* Relationships */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-2xl font-bold mb-4">Document Relationships</h2>
-          <div className="prose max-w-none">
-            {analysis.results.relationships}
-          </div>
-        </div>
+          {/* Knowledge Gaps */}
+          {analysis.results.knowledgeGaps && (
+            <div className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-2xl font-bold mb-4">Knowledge Gaps</h2>
+              
+              <div className="prose max-w-none">
+                <p className="text-lg text-gray-700 mb-6">{analysis.results.knowledgeGaps.summary}</p>
+                
+                <div className="space-y-6">
+                  {analysis.results.knowledgeGaps.gaps.map((gap, i) => (
+                    <div key={i} className="bg-red-50 p-4 rounded-lg">
+                      <h4 className="font-bold text-lg text-red-800">{gap.gap}</h4>
+                      <p className="my-2"><span className="font-medium">Impact:</span> {gap.impact}</p>
+                      
+                      {gap.affectedAreas.length > 0 && (
+                        <div className="mt-2">
+                          <p className="font-medium text-sm">Affected Areas:</p>
+                          <div className="flex flex-wrap gap-2 mt-1">
+                            {gap.affectedAreas.map((area, j) => (
+                              <span key={j} className="px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs">
+                                {area}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {gap.relatedDocuments.length > 0 && (
+                        <div className="mt-3">
+                          <p className="font-medium text-sm">Related Documents:</p>
+                          <ul className="list-disc pl-5 mt-1">
+                            {gap.relatedDocuments.map((doc, j) => (
+                              <li key={j} className="text-sm">
+                                <span className="font-medium">{doc.name}:</span> {doc.context}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
 
-        {/* Recommendations */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-2xl font-bold mb-4">Recommendations</h2>
-          <div className="prose max-w-none">
-            {analysis.results.recommendations}
-          </div>
+          {/* Recommendations */}
+          {analysis.results.recommendations && typeof analysis.results.recommendations !== 'string' && (
+            <div className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-2xl font-bold mb-4">Recommendations</h2>
+              
+              <div className="prose max-w-none">
+                <p className="text-lg text-gray-700 mb-6">{analysis.results.recommendations.summary}</p>
+                
+                <div className="space-y-6">
+                  {analysis.results.recommendations.priorities.map((rec, i) => (
+                    <div key={i} className="bg-green-50 p-4 rounded-lg">
+                      <div className="flex justify-between items-start">
+                        <h4 className="font-bold text-lg text-green-800">{rec.recommendation}</h4>
+                        <span className={`px-2 py-1 rounded-full text-xs font-bold ${
+                          rec.priority === 'HIGH' ? 'bg-red-100 text-red-800' :
+                          rec.priority === 'MEDIUM' ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-blue-100 text-blue-800'
+                        }`}>
+                          {rec.priority}
+                        </span>
+                      </div>
+                      
+                      <p className="my-2"><span className="font-medium">Rationale:</span> {rec.rationale}</p>
+                      <p className="my-2"><span className="font-medium">Implementation:</span> {rec.implementation}</p>
+                      
+                      {rec.relatedGaps.length > 0 && (
+                        <div className="mt-2">
+                          <p className="font-medium text-sm">Related Gaps:</p>
+                          <div className="flex flex-wrap gap-2 mt-1">
+                            {rec.relatedGaps.map((gap, j) => (
+                              <span key={j} className="px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs">
+                                {gap}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {rec.affectedDocuments.length > 0 && (
+                        <div className="mt-3">
+                          <p className="font-medium text-sm">Affected Documents:</p>
+                          <ul className="list-disc pl-5 mt-1">
+                            {rec.affectedDocuments.map((doc, j) => (
+                              <li key={j} className="text-sm">
+                                {doc.name}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
-      </div>
-    );
+      );
+    } else {
+      // Legacy format rendering
+      return (
+        <div className="space-y-8">
+          {/* Topics Analysis */}
+          {analysis.results.topics && (
+            <div className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-2xl font-bold mb-4">Topics Analysis</h2>
+              <div className="prose max-w-none">
+                {analysis.results.topics}
+              </div>
+            </div>
+          )}
+
+          {/* Knowledge Gaps */}
+          {analysis.results.gaps && (
+            <div className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-2xl font-bold mb-4">Knowledge Gaps</h2>
+              <div className="prose max-w-none">
+                {analysis.results.gaps}
+              </div>
+            </div>
+          )}
+
+          {/* Relationships */}
+          {analysis.results.relationships && (
+            <div className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-2xl font-bold mb-4">Document Relationships</h2>
+              <div className="prose max-w-none">
+                {analysis.results.relationships}
+              </div>
+            </div>
+          )}
+
+          {/* Recommendations */}
+          {analysis.results.recommendations && typeof analysis.results.recommendations === 'string' && (
+            <div className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-2xl font-bold mb-4">Recommendations</h2>
+              <div className="prose max-w-none">
+                {analysis.results.recommendations}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
   };
 
   if (loading) {
