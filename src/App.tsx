@@ -8,6 +8,7 @@ import AISearch from './components/AISearch';
 import AIInsights from './components/AIInsights';
 import KnowledgeBase from './components/KnowledgeBase';
 import KnowledgeInsights from './components/KnowledgeInsights';
+import KnowledgeQuery from './components/KnowledgeQuery';
 import AIAssistant from './components/AIAssistant';
 import AugmentedLearning from './components/AugmentedLearning';
 import CompanyManagement from './components/CompanyManagement';
@@ -29,6 +30,7 @@ function App() {
               <Route path="/insights" element={<AIInsights />} />
               <Route path="/knowledge" element={<KnowledgeBase />} />
               <Route path="/knowledge-insights" element={<KnowledgeInsights />} />
+              <Route path="/knowledge-query" element={<KnowledgeQuery />} />
               <Route path="/assistant" element={<AIAssistant />} />
               <Route path="/augmented-learning" element={<AugmentedLearning />} />
               <Route path="/companies" element={<CompanyManagement />} />
