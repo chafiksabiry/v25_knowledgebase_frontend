@@ -3,17 +3,38 @@ import { Brain, FileText, Video, Link as LinkIcon, BarChart2, TrendingUp, Search
 import { format, parseISO } from 'date-fns';
 import apiClient from '../api/client';
 import { jwtDecode } from 'jwt-decode';
+import axios from 'axios';
+
+interface AnalysisResults {
+  topics: string;
+  gaps: string;
+  relationships: string;
+  recommendations: string;
+}
+
+type AnalysisStatus = 'idle' | 'started' | 'in_progress' | 'completed' | 'failed';
+
+interface AnalysisState {
+  status: AnalysisStatus;
+  progress: number;
+  results: AnalysisResults | null;
+  error: string | null;
+}
 
 const KnowledgeInsights: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [knowledgeBase, setKnowledgeBase] = useState<any[]>([]);
-  const [analysis, setAnalysis] = useState<any | null>(null);
+  const [analysis, setAnalysis] = useState<AnalysisState>({
+    status: 'idle',
+    progress: 0,
+    results: null,
+    error: null
+  });
   const [selectedDocument, setSelectedDocument] = useState<any | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  type AnalysisStatus = 'idle' | 'processing' | 'completed' | 'failed';
-  const [analysisStatus, setAnalysisStatus] = useState<AnalysisStatus>('idle');
+  const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
   
   // Count resources by type
   const documentCount = knowledgeBase.filter(item => item.type === 'document').length;
@@ -25,7 +46,7 @@ const KnowledgeInsights: React.FC = () => {
     .sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())
     .slice(0, 5);
 
-  // Function to get companyId from JWT
+  // Get companyId from JWT
   const getCompanyIdFromToken = () => {
     const token = localStorage.getItem('jwtToken');
     if (!token) {
@@ -41,9 +62,102 @@ const KnowledgeInsights: React.FC = () => {
     }
   };
 
-  // Fetch documents and latest analysis
+  // Function to check analysis status
+  const checkAnalysisStatus = async (companyId: string) => {
+    try {
+      console.log('📊 Checking analysis status...');
+      const response = await apiClient.get(`/analysis/${companyId}`);
+      
+      if (response.data.exists && response.data.analysis) {
+        const currentAnalysis = response.data.analysis;
+        console.log('📊 Analysis status update:', currentAnalysis.status);
+        
+        setAnalysis({
+          status: currentAnalysis.status,
+          progress: currentAnalysis.progress || 0,
+          results: currentAnalysis.results || null,
+          error: currentAnalysis.error || null
+        });
+
+        // If analysis is completed or failed, stop polling
+        if (currentAnalysis.status === 'completed' || currentAnalysis.status === 'failed') {
+          console.log('📊 Analysis finished, stopping polling');
+          if (pollingInterval) {
+            clearInterval(pollingInterval);
+            setPollingInterval(null);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error checking analysis status:', error);
+      // Don't stop polling on error, just log it
+    }
+  };
+
+  // Start polling for analysis status
+  const startPolling = (companyId: string) => {
+    if (pollingInterval) {
+      clearInterval(pollingInterval);
+    }
+    
+    console.log('🔄 Starting polling for analysis status');
+    const interval = setInterval(() => checkAnalysisStatus(companyId), 3000); // Poll every 3 seconds
+    setPollingInterval(interval);
+  };
+
+  // Helper function to start new analysis
+  const startNewAnalysis = async (companyId: string) => {
+    try {
+      console.log('🚀 Starting new analysis for company:', companyId);
+      
+      // Clear any previous errors and set status to in_progress
+      setAnalysis(prev => ({
+        ...prev,
+        error: null,
+        status: 'in_progress',
+        progress: 0
+      }));
+
+      const startResponse = await apiClient.post('/analysis/start', { companyId });
+      console.log('📊 Analysis start response:', startResponse.data);
+
+      if (!startResponse.data.success) {
+        throw new Error(startResponse.data.message || 'Failed to start analysis');
+      }
+
+      // Start polling for updates
+      startPolling(companyId);
+
+      if (startResponse.data.results) {
+        // If we got immediate results
+        console.log('📦 Received immediate analysis results');
+        setAnalysis({
+          status: 'completed',
+          progress: 100,
+          results: startResponse.data.results,
+          error: null
+        });
+      }
+    } catch (error: any) {
+      console.error('❌ Analysis error:', error);
+      
+      const errorMessage = error.response?.data?.message || error.message;
+      const isRateLimit = errorMessage?.includes('429') || 
+                         errorMessage?.includes('Too Many Requests');
+      
+      setAnalysis(prev => ({
+        ...prev,
+        status: 'failed',
+        error: isRateLimit ? 
+          'Rate limit exceeded. Please wait a few minutes before trying again.' :
+          `Failed to start analysis: ${errorMessage}`
+      }));
+    }
+  };
+
+  // Fetch documents and handle analysis
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchDataAndInitializeAnalysis = async () => {
       try {
         setLoading(true);
         const companyId = getCompanyIdFromToken();
@@ -52,10 +166,17 @@ const KnowledgeInsights: React.FC = () => {
           throw new Error('Company ID not found');
         }
 
-        // Fetch documents
+        console.log('🔄 Initializing data fetch for company:', companyId);
+
+        // Fetch documents first
+        console.log('📚 Fetching knowledge base documents...');
         const docsResponse = await apiClient.get('/documents', {
           params: { companyId }
         });
+
+        if (!docsResponse.data.documents) {
+          throw new Error('No documents found');
+        }
 
         const documents = docsResponse.data.documents.map((doc: any) => ({
           id: doc._id,
@@ -71,73 +192,63 @@ const KnowledgeInsights: React.FC = () => {
         }));
 
         setKnowledgeBase(documents);
+        console.log('📚 Loaded knowledge base documents:', documents.length);
 
-        // Fetch latest analysis
-        const analysisResponse = await apiClient.get('/analysis', {
-          params: { companyId }
-        });
+        // Check for existing analysis
+        console.log('🔍 Checking for existing analysis...');
+        const analysisResponse = await apiClient.get(`/analysis/${companyId}`);
+        
+        if (analysisResponse.data.exists && analysisResponse.data.analysis) {
+          const existingAnalysis = analysisResponse.data.analysis;
+          console.log('📦 Found existing analysis:', {
+            status: existingAnalysis.status,
+            documentCount: existingAnalysis.documentCount
+          });
 
-        if (analysisResponse.data.analyses && analysisResponse.data.analyses.length > 0) {
-          const latestAnalysis = analysisResponse.data.analyses[0];
-          
-          // Check if analysis is still valid
-          const isAnalysisValid = validateAnalysis(latestAnalysis, documents);
-          
-          if (isAnalysisValid) {
-            setAnalysis(latestAnalysis);
-            setAnalysisStatus(latestAnalysis.status);
-          } else {
-            // Analysis is outdated, start a new one
-            await startNewAnalysis();
+          setAnalysis({
+            status: existingAnalysis.status,
+            progress: existingAnalysis.status === 'completed' ? 100 : existingAnalysis.progress || 0,
+            results: existingAnalysis.results || null,
+            error: existingAnalysis.error || null
+          });
+
+          // If analysis is in progress, start polling
+          if (existingAnalysis.status === 'in_progress') {
+            console.log('⏳ Analysis is in progress, starting polling...');
+            startPolling(companyId);
           }
         } else {
           // No analysis exists, start a new one
-          await startNewAnalysis();
+          console.log('ℹ️ No existing analysis found, starting new analysis');
+          await startNewAnalysis(companyId);
         }
 
+        setLoading(false);
       } catch (error) {
-        console.error('Error fetching data:', error);
-        setError('Failed to fetch insights data');
-      } finally {
+        console.error('❌ Error during initialization:', error);
+        setError('Failed to initialize knowledge base analysis');
+        setAnalysis(prev => ({
+          ...prev,
+          status: 'failed',
+          error: error instanceof Error ? error.message : 'Unknown error occurred'
+        }));
         setLoading(false);
       }
     };
 
-    fetchData();
+    fetchDataAndInitializeAnalysis();
+
+    // Cleanup polling on unmount
+    return () => {
+      if (pollingInterval) {
+        console.log('🧹 Cleaning up polling interval');
+        clearInterval(pollingInterval);
+      }
+    };
   }, []);
 
-  // Add validation function for analysis
-  const validateAnalysis = (analysis: any, currentDocuments: any[]) => {
-    if (!analysis) return false;
-
-    // Check if analysis is completed
-    if (analysis.status !== 'completed') return false;
-
-    // Check if the document count matches
-    const analysisDocCount = analysis.metrics?.documentCount || 0;
-    if (analysisDocCount !== currentDocuments.length) return false;
-
-    // Check if analysis is not too old (e.g., more than 24 hours)
-    const analysisDate = new Date(analysis.createdAt || analysis.updatedAt);
-    const now = new Date();
-    const hoursSinceAnalysis = (now.getTime() - analysisDate.getTime()) / (1000 * 60 * 60);
-    if (hoursSinceAnalysis > 24) return false;
-
-    // Check if all current documents are included in the analysis
-    const analysisDocIds = new Set(analysis.analyzedDocuments || []);
-    const currentDocIds = new Set(currentDocuments.map(doc => doc.id));
-    
-    // Check if the sets have the same size and all current documents are in the analysis
-    if (analysisDocIds.size !== currentDocIds.size) return false;
-    for (const docId of currentDocIds) {
-      if (!analysisDocIds.has(docId)) return false;
-    }
-
-    return true;
-  };
-
-  // Update startNewAnalysis to include current document IDs
-  const startNewAnalysis = async () => {
+  // Modified startAnalysis function for manual reanalysis
+  const startAnalysis = async () => {
     try {
       const companyId = getCompanyIdFromToken();
       
@@ -145,38 +256,25 @@ const KnowledgeInsights: React.FC = () => {
         throw new Error('Company ID not found');
       }
 
-      setAnalysisStatus('processing');
+      console.log('🔄 Starting manual reanalysis for company:', companyId);
       
-      const response = await apiClient.post('/analysis/knowledge-base', {
-        companyId,
-        documentIds: knowledgeBase.map(doc => doc.id) // Include current document IDs
-      });
+      // Prevent starting new analysis if one is already in progress
+      if (analysis.status === 'in_progress' as const) {
+        console.log('⚠️ Analysis already in progress, skipping new request');
+        return;
+      }
 
-      // Poll for analysis completion
-      const pollInterval = setInterval(async () => {
-        try {
-          const statusResponse = await apiClient.get(`/analysis/${response.data.analysisId}`);
-          const currentAnalysis = statusResponse.data.analysis;
-
-          if (currentAnalysis.status === 'completed' || currentAnalysis.status === 'failed') {
-            clearInterval(pollInterval);
-            setAnalysis(currentAnalysis);
-            setAnalysisStatus(currentAnalysis.status);
-          }
-        } catch (error) {
-          console.error('Error polling analysis status:', error);
-          clearInterval(pollInterval);
-          setAnalysisStatus('failed');
-        }
-      }, 5000); // Poll every 5 seconds
-
+      await startNewAnalysis(companyId);
     } catch (error) {
-      console.error('Error starting analysis:', error);
-      setAnalysisStatus('failed');
-      setError('Failed to start analysis');
+      console.error('❌ Manual reanalysis error:', error);
+      setAnalysis(prev => ({
+        ...prev,
+        status: 'failed',
+        error: error instanceof Error ? error.message : 'Failed to start analysis'
+      }));
     }
   };
-  
+
   // Get resource icon
   const getResourceIcon = (type: string) => {
     switch (type) {
@@ -232,6 +330,46 @@ const KnowledgeInsights: React.FC = () => {
   // Function to open document in new tab
   const openDocumentInNewTab = (fileUrl: string) => {
     window.open(fileUrl, '_blank');
+  };
+
+  const renderResults = () => {
+    if (!analysis.results) return null;
+
+    return (
+      <div className="space-y-8">
+        {/* Topics Analysis */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-2xl font-bold mb-4">Topics Analysis</h2>
+          <div className="prose max-w-none">
+            {analysis.results.topics}
+          </div>
+        </div>
+
+        {/* Knowledge Gaps */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-2xl font-bold mb-4">Knowledge Gaps</h2>
+          <div className="prose max-w-none">
+            {analysis.results.gaps}
+          </div>
+        </div>
+
+        {/* Relationships */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-2xl font-bold mb-4">Document Relationships</h2>
+          <div className="prose max-w-none">
+            {analysis.results.relationships}
+          </div>
+        </div>
+
+        {/* Recommendations */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-2xl font-bold mb-4">Recommendations</h2>
+          <div className="prose max-w-none">
+            {analysis.results.recommendations}
+          </div>
+        </div>
+      </div>
+    );
   };
 
   if (loading) {
@@ -327,143 +465,55 @@ const KnowledgeInsights: React.FC = () => {
             <Brain size={20} className="text-purple-600 mr-2" />
             <h2 className="text-lg font-semibold">AI-Generated Insights</h2>
           </div>
-          {analysisStatus && (
-            <button
-              onClick={startNewAnalysis}
-              className="flex items-center space-x-2 px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={analysisStatus === 'processing'}
-              title={analysisStatus === 'processing' ? 'Analysis in progress...' : 'Start a new analysis'}
-            >
-              <Brain size={16} className={analysisStatus === 'processing' ? 'animate-spin' : ''} />
-              <span>{analysisStatus === 'processing' ? 'Analyzing...' : 'Reanalyze'}</span>
-            </button>
-          )}
+          <button
+            onClick={startAnalysis}
+            disabled={analysis.status === ('in_progress' as AnalysisStatus)}
+            className="flex items-center space-x-2 px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Brain size={16} />
+            <span>{analysis.results ? 'Reanalyze' : 'Start Analysis'}</span>
+          </button>
         </div>
         
         <div className="p-4 space-y-4">
-          {analysis?.status === 'processing' ? (
-            <div className="flex items-center justify-center p-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-3"></div>
-              <span className="text-gray-600">Analyzing knowledge base...</span>
-            </div>
-          ) : analysis?.status === 'completed' ? (
-            <>
-              {/* Summary */}
-              <div className="bg-white p-4 rounded-lg border border-gray-200">
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Analysis Summary</h3>
-                <p className="text-gray-700">{analysis.summary}</p>
+          {analysis.status === 'in_progress' && (
+            <div className="flex flex-col items-center justify-center p-8">
+              <div className="flex items-center mb-4">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-3"></div>
+                <span className="text-gray-600">Analyzing knowledge base...</span>
               </div>
-
-              {/* Metrics */}
-              {analysis.metrics && (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                  {Object.entries(analysis.metrics).map(([key, value]) => (
-                    <div key={key} className="bg-white p-4 rounded-lg border border-gray-200">
-                      <p className="text-sm text-gray-500 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</p>
-                      <p className="text-2xl font-bold text-gray-900">{(Number(value) * 100).toFixed(0)}%</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Insights */}
-              {analysis.insights && analysis.insights.length > 0 && (
-                <div className="space-y-4">
-                  {analysis.insights.map((insight: any, index: number) => (
-                    <div 
-                      key={index}
-                      className={`p-4 rounded-lg ${getInsightBgColor(insight.category)}`}
-                    >
-                      <div className="flex items-start">
-                        <div className="mr-4">
-                          {getInsightIcon(insight.category)}
-                        </div>
-                        <div className="flex-grow">
-                          <div className="flex items-center justify-between mb-1">
-                            <h3 className="text-lg font-medium text-gray-900">{insight.title}</h3>
-                            <span className={`px-2 py-1 text-xs rounded-full ${
-                              insight.severity === 'high' ? 'bg-red-100 text-red-800' :
-                              insight.severity === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                              'bg-green-100 text-green-800'
-                            }`}>
-                              {insight.severity.charAt(0).toUpperCase() + insight.severity.slice(1)} Priority
-                            </span>
-                          </div>
-                          <p className="text-gray-700">{insight.description}</p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Content Gaps */}
-              {analysis.contentGaps && analysis.contentGaps.length > 0 && (
-                <div className="bg-white p-4 rounded-lg border border-gray-200">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">Content Gaps</h3>
-                  <div className="space-y-4">
-                    {analysis.contentGaps.map((gap: any, index: number) => (
-                      <div key={index} className="border-b border-gray-200 last:border-0 pb-4 last:pb-0">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-grow">
-                            <p className="text-gray-900 font-medium mb-1">{gap.description}</p>
-                            <p className="text-sm text-gray-600 mb-2">Affected sections: {gap.affectedSections.join(', ')}</p>
-                            <p className="text-sm text-gray-700">{gap.recommendation}</p>
-                          </div>
-                          <span className={`ml-4 px-2 py-1 text-xs rounded-full whitespace-nowrap ${
-                            gap.severity === 'high' ? 'bg-red-100 text-red-800' :
-                            gap.severity === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-green-100 text-green-800'
-                          }`}>
-                            {gap.severity.charAt(0).toUpperCase() + gap.severity.slice(1)} Priority
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Recommendations */}
-              {analysis.recommendations && analysis.recommendations.length > 0 && (
-                <div className="bg-white p-4 rounded-lg border border-gray-200">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">Recommendations</h3>
-                  <div className="space-y-4">
-                    {analysis.recommendations.map((rec: any, index: number) => (
-                      <div key={index} className="border-b border-gray-200 last:border-0 pb-4 last:pb-0">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-grow">
-                            <p className="text-gray-900 font-medium mb-1">{rec.description}</p>
-                            <p className="text-sm text-gray-600 mb-2">Impact: {rec.impact}</p>
-                            <p className="text-sm text-gray-700">Implementation: {rec.implementationDifficulty}</p>
-                          </div>
-                          <span className={`ml-4 px-2 py-1 text-xs rounded-full whitespace-nowrap ${
-                            rec.priority === 'high' ? 'bg-red-100 text-red-800' :
-                            rec.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-green-100 text-green-800'
-                          }`}>
-                            {rec.priority.charAt(0).toUpperCase() + rec.priority.slice(1)} Priority
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </>
-          ) : analysis?.status === 'failed' ? (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
-              <strong className="font-bold">Analysis failed!</strong>
-              <p className="mt-2">There was an error analyzing your knowledge base. Please try again.</p>
+              <div className="w-full max-w-md bg-gray-200 rounded-full h-2.5">
+                <div 
+                  className="bg-blue-600 h-2.5 rounded-full transition-all duration-500"
+                  style={{ width: `${analysis.progress}%` }}
+                ></div>
+              </div>
+              <span className="text-sm text-gray-500 mt-2">{analysis.progress}% complete</span>
+            </div>
+          )}
+          
+          {analysis.status === 'completed' && analysis.results && renderResults()}
+          
+          {analysis.status === 'failed' && (
+            <div className="text-center py-8">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-100 mb-4">
+                <X size={24} className="text-red-600" />
+              </div>
+              <h3 className="text-lg font-medium text-red-900 mb-1">Analysis Failed</h3>
+              <p className="text-red-500 max-w-md mx-auto mb-4">
+                {analysis.error || 'An error occurred during analysis. Please try again.'}
+              </p>
               <button
-                onClick={startNewAnalysis}
-                className="mt-4 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center"
+                onClick={startAnalysis}
+                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center mx-auto"
               >
                 <Brain size={18} className="mr-2" />
                 Retry Analysis
               </button>
             </div>
-          ) : (
+          )}
+          
+          {analysis.status === 'idle' && (
             <div className="text-center py-8">
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 mb-4">
                 <Brain size={24} className="text-gray-400" />
@@ -473,7 +523,7 @@ const KnowledgeInsights: React.FC = () => {
                 Start a new analysis to get AI-generated insights about your knowledge base.
               </p>
               <button
-                onClick={startNewAnalysis}
+                onClick={startAnalysis}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center mx-auto"
               >
                 <Brain size={18} className="mr-2" />
