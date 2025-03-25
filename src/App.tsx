@@ -25,6 +25,7 @@ function App() {
           <main className="flex-1 overflow-y-auto">
             <Routes>
               <Route path="/" element={<Dashboard />} />
+              <Route path="/app9" element={<Dashboard />} />
               <Route path="/contacts" element={<ContactsList />} />
               <Route path="/search" element={<AISearch />} />
               <Route path="/insights" element={<AIInsights />} />
