@@ -7,4 +7,12 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['lucide-react'],
   },
+  server: {
+    port: 5180,
+    cors: true,
+    hmr: false,
+    fs: {
+      strict: true, // Ensure static assets are correctly resolved
+    },
+  },
 });

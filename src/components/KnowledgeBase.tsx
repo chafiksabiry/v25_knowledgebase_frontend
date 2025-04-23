@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Upload, File, FileText, Video, Link as LinkIcon, Plus, Search, Trash2, Filter, Download, Mic, Play, Clock, Pause, ChevronDown, ChevronUp, X, ExternalLink, Eye } from 'lucide-react';
 import { format } from 'date-fns';
 import { KnowledgeItem, CallRecord } from '../types';
-import { jwtDecode } from 'jwt-decode';
 import apiClient from '../api/client';
+import Cookies from 'js-cookie';
 
 const KnowledgeBase: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -114,33 +114,26 @@ const KnowledgeBase: React.FC = () => {
   };
   
   // Function to get companyId from JWT
-  const getCompanyIdFromToken = () => {
-    const token = localStorage.getItem('jwtToken');
-    if (!token) {
-      console.log('No JWT token found in localStorage');
+  const getUserId = () => {
+    const userId = Cookies.get('userId');
+    if (!userId) {
+      console.log('No userId found in localStorage');
       return null;
     }
-    try {
-      const decoded: any = jwtDecode(token);
-      console.log('Decoded JWT:', decoded);
-      return decoded.companyId;
-    } catch (error) {
-      console.error('Failed to decode JWT:', error);
-      return null;
-    }
+    return userId;
   };
 
   // Fetch documents from the backend
   useEffect(() => {
     const fetchDocuments = async () => {
       try {
-        const companyId = getCompanyIdFromToken();
-        if (!companyId) {
-          throw new Error('Company ID not found');
+        const userId = getUserId();
+        if (!userId) {
+          throw new Error('User ID not found');
         }
 
         const response = await apiClient.get('/documents', {
-          params: { companyId }
+          params: { userId }
         });
         console.log('Response fetching documents:', response);
         const documents = response.data.documents.map((doc: any) => ({
@@ -168,13 +161,13 @@ const KnowledgeBase: React.FC = () => {
   useEffect(() => {
     const fetchCallRecords = async () => {
       try {
-        const companyId = getCompanyIdFromToken();
-        if (!companyId) {
-          throw new Error('Company ID not found');
+        const userId = getUserId();
+        if (!userId) {
+          throw new Error('userId ID not found');
         }
 
         const response = await apiClient.get('/call-recordings', {
-          params: { companyId }
+          params: { userId }
         });
         console.log('Response fetching call records:', response);
         const calls = response.data.callRecordings.map((call: any) => ({
@@ -219,12 +212,12 @@ const KnowledgeBase: React.FC = () => {
         throw new Error('No file selected');
       }
 
-      const companyId = getCompanyIdFromToken();
-      if (!companyId) {
-        throw new Error('Company ID not found');
+      const userId = getUserId();
+      if (!userId) {
+        throw new Error('User ID not found');
       }
 
-      console.log('Company ID:', companyId);
+      console.log('User ID:', userId);
 
       const formData = new FormData();
       formData.append('file', uploadFile);
@@ -394,9 +387,9 @@ const KnowledgeBase: React.FC = () => {
         throw new Error('No file selected');
       }
 
-      const companyId = getCompanyIdFromToken();
-      if (!companyId) {
-        throw new Error('Company ID not found');
+      const userId = getUserId();
+      if (!userId) {
+        throw new Error('User ID not found');
       }
 
       const audioUrl = await createFileUrl(uploadFile);
@@ -412,7 +405,7 @@ const KnowledgeBase: React.FC = () => {
       formData.append('tags', uploadTags);
       formData.append('aiInsights', '');
       formData.append('repId', 'current-user');
-      formData.append('companyId', companyId);
+      formData.append('userId', userId);
 
       const response = await apiClient.post('/call-recordings/upload', formData);
 
