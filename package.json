@@ -7,11 +7,13 @@
     "dev": "vite --host",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "build:qiankun": "vite build --mode qiankun"
   },
   "dependencies": {
     "@types/jwt-decode": "^3.1.0",
     "axios": "^1.8.3",
+    "cheerio": "^1.0.0",
     "date-fns": "^3.3.1",
     "js-cookie": "^3.0.5",
     "jwt-decode": "^4.0.0",
@@ -19,7 +21,10 @@
     "lucide-react": "^0.344.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^6.22.3"
+    "react-router-dom": "^6.22.3",
+    "qiankun": "^2.10.16",
+    "systemjs": "^6.15.1",
+    "vite-plugin-qiankun": "^1.0.15"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.1",
