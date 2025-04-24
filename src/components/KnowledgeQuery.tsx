@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Search, Send, Loader2 } from 'lucide-react';
 import apiClient from '../api/client';
-import Cookies from 'js-cookie';
 
 interface QueryResponse {
   success: boolean;
@@ -31,12 +30,7 @@ const KnowledgeQuery: React.FC = () => {
 
   // Get userId from cookies
   const getUserId = () => {
-    const userId = Cookies.get('userId');
-    if (!userId) {
-      console.log('No userId found in localStorage');
-      return null;
-    }
-    return userId;
+    return "6808ef00413780df329d8833";
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

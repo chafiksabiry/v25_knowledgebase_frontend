@@ -4,7 +4,6 @@ import { format, parseISO } from 'date-fns';
 import apiClient from '../api/client';
 import { jwtDecode } from 'jwt-decode';
 import axios from 'axios';
-import Cookies from 'js-cookie';
 
 
 // New structured format interfaces
@@ -100,12 +99,7 @@ const KnowledgeInsights: React.FC = () => {
 
   // Get userId from cookies
   const getUserId = () => {
-    const userId = Cookies.get('userId');
-    if (!userId) {
-      console.log('No userId found in localStorage');
-      return null;
-    }
-    return userId;
+    return "6808ef00413780df329d8833";
   };
 
   // Add debounce mechanism

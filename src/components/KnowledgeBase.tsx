@@ -3,7 +3,6 @@ import { Upload, File, FileText, Video, Link as LinkIcon, Plus, Search, Trash2, 
 import { format } from 'date-fns';
 import { KnowledgeItem, CallRecord } from '../types';
 import apiClient from '../api/client';
-import Cookies from 'js-cookie';
 
 const KnowledgeBase: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -115,12 +114,7 @@ const KnowledgeBase: React.FC = () => {
   
   // Function to get companyId from JWT
   const getUserId = () => {
-    const userId = Cookies.get('userId');
-    if (!userId) {
-      console.log('No userId found in localStorage');
-      return null;
-    }
-    return userId;
+    return "6808ef00413780df329d8833";
   };
 
   // Fetch documents from the backend
