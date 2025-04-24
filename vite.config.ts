@@ -35,7 +35,7 @@ export default defineConfig(({ mode }) => {
       'import.meta.env': env,
     },
     server: {
-      port: 5182,
+      port: 5180,
       cors: true,
       hmr: false,
       fs: {

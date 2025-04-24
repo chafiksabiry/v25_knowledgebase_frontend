@@ -225,7 +225,7 @@ const KnowledgeBase: React.FC = () => {
       formData.append('description', uploadDescription);
       formData.append('tags', uploadTags);
       formData.append('uploadedBy', 'Current User');
-      formData.append('companyId', companyId);
+      formData.append('userId', userId);
 
       const response = await apiClient.post('/documents/upload', formData);
 

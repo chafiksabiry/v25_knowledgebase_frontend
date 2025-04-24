@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Search, Send, Loader2 } from 'lucide-react';
 import apiClient from '../api/client';
-import { jwtDecode } from 'jwt-decode';
+import Cookies from 'js-cookie';
 
 interface QueryResponse {
   success: boolean;
@@ -29,20 +29,14 @@ const KnowledgeQuery: React.FC = () => {
   const [response, setResponse] = useState<QueryResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Get companyId from JWT
-  const getCompanyIdFromToken = () => {
-    const token = localStorage.getItem('jwtToken');
-    if (!token) {
-      console.log('No JWT token found in localStorage');
+  // Get userId from cookies
+  const getUserId = () => {
+    const userId = Cookies.get('userId');
+    if (!userId) {
+      console.log('No userId found in localStorage');
       return null;
     }
-    try {
-      const decoded: any = jwtDecode(token);
-      return decoded.companyId;
-    } catch (error) {
-      console.error('Failed to decode JWT:', error);
-      return null;
-    }
+    return userId;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -52,13 +46,13 @@ const KnowledgeQuery: React.FC = () => {
     setResponse(null);
 
     try {
-      const companyId = getCompanyIdFromToken();
-      if (!companyId) {
-        throw new Error('Company ID not found');
+      const userId = getUserId();
+      if (!userId) {
+        throw new Error('User ID not found');
       }
 
       const response = await apiClient.post<QueryResponse>('/analysis/ask', {
-        companyId,
+        userId,
         query
       });
 

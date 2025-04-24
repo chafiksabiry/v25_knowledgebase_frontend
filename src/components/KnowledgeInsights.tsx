@@ -4,6 +4,8 @@ import { format, parseISO } from 'date-fns';
 import apiClient from '../api/client';
 import { jwtDecode } from 'jwt-decode';
 import axios from 'axios';
+import Cookies from 'js-cookie';
+
 
 // New structured format interfaces
 interface TopicAnalysis {
@@ -75,6 +77,7 @@ const KnowledgeInsights: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [knowledgeBase, setKnowledgeBase] = useState<any[]>([]);
+  const [companyId, setCompanyId] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<AnalysisState>({
     status: 'idle',
     progress: 0,
@@ -95,20 +98,14 @@ const KnowledgeInsights: React.FC = () => {
     .sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())
     .slice(0, 5);
 
-  // Get companyId from JWT
-  const getCompanyIdFromToken = () => {
-    const token = localStorage.getItem('jwtToken');
-    if (!token) {
-      console.log('No JWT token found in localStorage');
+  // Get userId from cookies
+  const getUserId = () => {
+    const userId = Cookies.get('userId');
+    if (!userId) {
+      console.log('No userId found in localStorage');
       return null;
     }
-    try {
-      const decoded: any = jwtDecode(token);
-      return decoded.companyId;
-    } catch (error) {
-      console.error('Failed to decode JWT:', error);
-      return null;
-    }
+    return userId;
   };
 
   // Add debounce mechanism
@@ -221,24 +218,28 @@ const KnowledgeInsights: React.FC = () => {
     const fetchDataAndInitializeAnalysis = async () => {
       try {
         setLoading(true);
-        const companyId = getCompanyIdFromToken();
+        const userId = getUserId();
         
-        if (!companyId) {
-          throw new Error('Company ID not found');
+        if (!userId) {
+          throw new Error('User ID not found');
         }
 
-        console.log('🔄 Initializing data fetch for company:', companyId);
+        console.log('🔄 Initializing data fetch for user:', userId);
 
         // Fetch documents first
         console.log('📚 Fetching knowledge base documents...');
         const docsResponse = await apiClient.get('/documents', {
-          params: { companyId }
+          params: { userId }
         });
+
+        console.log('🔍 Docs Response:', docsResponse.data);
 
         if (!docsResponse.data.documents) {
           throw new Error('No documents found');
         }
-
+        const compId = docsResponse.data.documents[0].companyId;
+        console.log('🔍 Company ID:', compId);
+        setCompanyId(compId);
         const documents = docsResponse.data.documents.map((doc: any) => ({
           id: doc._id,
           name: doc.name,
@@ -276,7 +277,7 @@ const KnowledgeInsights: React.FC = () => {
           // If analysis is in progress, start polling
           if (existingAnalysis.status === 'in_progress') {
             console.log('⏳ Analysis is in progress, starting polling...');
-            startPolling(companyId);
+            startPolling(companyId!);
           }
         } else {
           // No analysis exists, check if we should auto-start one 
@@ -322,7 +323,6 @@ const KnowledgeInsights: React.FC = () => {
   // Modified startAnalysis function for manual reanalysis
   const startAnalysis = async () => {
     try {
-      const companyId = getCompanyIdFromToken();
       
       if (!companyId) {
         throw new Error('Company ID not found');
