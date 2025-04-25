@@ -15,9 +15,12 @@ import CompanyManagement from './components/CompanyManagement';
 import UserManagement from './components/UserManagement';
 import PermissionsManagement from './components/PermissionsManagement';
 
+// ⬇️ Ajoute le qiankun helper
+import { qiankunWindow } from 'vite-plugin-qiankun/dist/helper';
+
 function App() {
   return (
-    <Router>
+    <Router basename={qiankunWindow.__POWERED_BY_QIANKUN__ ? '/knowledgebase' : '/'}>
       <div className="flex h-screen bg-gray-50">
         <Sidebar />
         <div className="flex-1 flex flex-col overflow-hidden">
@@ -37,9 +40,24 @@ function App() {
               <Route path="/companies" element={<CompanyManagement />} />
               <Route path="/users" element={<UserManagement />} />
               <Route path="/permissions" element={<PermissionsManagement />} />
-              <Route path="/tags" element={<div className="p-6"><h1 className="text-2xl font-bold">Tags Management</h1><p className="mt-4">This feature is coming soon.</p></div>} />
-              <Route path="/analytics" element={<div className="p-6"><h1 className="text-2xl font-bold">Analytics</h1><p className="mt-4">This feature is coming soon.</p></div>} />
-              <Route path="/settings" element={<div className="p-6"><h1 className="text-2xl font-bold">Settings</h1><p className="mt-4">This feature is coming soon.</p></div>} />
+              <Route path="/tags" element={
+                <div className="p-6">
+                  <h1 className="text-2xl font-bold">Tags Management</h1>
+                  <p className="mt-4">This feature is coming soon.</p>
+                </div>
+              } />
+              <Route path="/analytics" element={
+                <div className="p-6">
+                  <h1 className="text-2xl font-bold">Analytics</h1>
+                  <p className="mt-4">This feature is coming soon.</p>
+                </div>
+              } />
+              <Route path="/settings" element={
+                <div className="p-6">
+                  <h1 className="text-2xl font-bold">Settings</h1>
+                  <p className="mt-4">This feature is coming soon.</p>
+                </div>
+              } />
             </Routes>
           </main>
         </div>
