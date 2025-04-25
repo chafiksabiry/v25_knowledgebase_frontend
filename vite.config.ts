@@ -20,7 +20,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
 
   return {
-    base: 'https://knowledge-base.harx.ai/',
+    base: 'https://preprod-knowledge-base.harx.ai/',
     plugins: [
       react({
         jsxRuntime: 'classic',
@@ -35,7 +35,7 @@ export default defineConfig(({ mode }) => {
       'import.meta.env': env,
     },
     server: {
-      port: 5182,
+      port: 5180,
       cors: true,
       hmr: false,
       fs: {
