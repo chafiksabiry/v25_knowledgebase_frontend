@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Search, Send, Loader2 } from 'lucide-react';
 import apiClient from '../api/client';
+import Cookies from 'js-cookie';
 
 interface QueryResponse {
   success: boolean;
@@ -30,7 +31,22 @@ const KnowledgeQuery: React.FC = () => {
 
   // Get userId from cookies
   const getUserId = () => {
-    return "6808ef00413780df329d8833";
+    const runMode = import.meta.env.VITE_RUN_MODE || 'in-app';
+    let userId;
+    // Determine userId based on run mode
+    if (runMode === 'standalone') {
+      console.log("Running in standalone mode");
+      // Use static userId from environment variable in standalone mode
+      userId = import.meta.env.VITE_STANDALONE_USER_ID;
+      console.log("Using static userID from env:", userId);
+    } else {
+      console.log("Running in in-app mode");
+      // Use userId from cookies in in-app mode
+      userId = Cookies.get('userId');
+      console.log("userId cookie:", userId);
+      console.log("Verified saved user ID from cookie:", userId);
+    }
+    return userId;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

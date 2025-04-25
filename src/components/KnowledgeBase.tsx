@@ -3,6 +3,8 @@ import { Upload, File, FileText, Video, Link as LinkIcon, Plus, Search, Trash2, 
 import { format } from 'date-fns';
 import { KnowledgeItem, CallRecord } from '../types';
 import apiClient from '../api/client';
+import Cookies from 'js-cookie';
+
 
 const KnowledgeBase: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -114,7 +116,22 @@ const KnowledgeBase: React.FC = () => {
   
   // Function to get companyId from JWT
   const getUserId = () => {
-    return "6808ef00413780df329d8833";
+    const runMode = import.meta.env.VITE_RUN_MODE || 'in-app';
+    let userId;
+    // Determine userId based on run mode
+    if (runMode === 'standalone') {
+      console.log("Running in standalone mode");
+      // Use static userId from environment variable in standalone mode
+      userId = import.meta.env.VITE_STANDALONE_USER_ID;
+      console.log("Using static userID from env:", userId);
+      } else {
+      console.log("Running in in-app mode");
+      // Use userId from cookies in in-app mode
+      userId = Cookies.get('userId');
+      console.log("userId cookie:", userId);
+      console.log("Verified saved user ID from cookie:", userId);
+    }
+    return userId;
   };
 
   // Fetch documents from the backend
