@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 import { KnowledgeItem, CallRecord } from '../types';
 import apiClient from '../api/client';
 import Cookies from 'js-cookie';
+import axios from 'axios';
 
 
 const KnowledgeBase: React.FC = () => {
@@ -20,6 +21,7 @@ const KnowledgeBase: React.FC = () => {
   const [knowledgeItems, setKnowledgeItems] = useState<KnowledgeItem[]>([]);
   const [callRecords, setCallRecords] = useState<CallRecord[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [isFirstUpload, setIsFirstUpload] = useState(true);
   const [contactId, setContactId] = useState('');
   const [callDuration, setCallDuration] = useState('');
   const [sentiment, setSentiment] = useState<'positive' | 'negative' | 'neutral'>('neutral');
@@ -134,38 +136,85 @@ const KnowledgeBase: React.FC = () => {
     return userId;
   };
 
-  // Fetch documents from the backend
-  useEffect(() => {
-    const fetchDocuments = async () => {
-      try {
-        const userId = getUserId();
-        if (!userId) {
-          throw new Error('User ID not found');
-        }
-
-        const response = await apiClient.get('/documents', {
-          params: { userId }
-        });
-        console.log('Response fetching documents:', response);
-        const documents = response.data.documents.map((doc: any) => ({
-          id: doc._id,
-          name: doc.name,
-          description: doc.description,
-          type: 'document',
-          fileUrl: doc.fileUrl,
-          uploadedAt: format(new Date(doc.uploadedAt), 'yyyy-MM-dd'),
-          uploadedBy: doc.uploadedBy,
-          tags: doc.tags,
-          usagePercentage: 0,
-          isPublic: true
-        }));
-        setKnowledgeItems(documents);
-      } catch (error) {
-        console.error('Error fetching documents:', error);
+  // Function to update onboarding progress
+  const updateOnboardingProgress = async () => {
+    try {
+      const companyId = Cookies.get('companyId');
+      console.log('Attempting to update onboarding progress for company:', companyId);
+      
+      if (!companyId) {
+        throw new Error('Company ID not found in cookies');
       }
-    };
 
-    fetchDocuments();
+      const apiUrl = import.meta.env.VITE_API_URL_ONBOARDING;
+      console.log('Using API URL:', apiUrl);
+      
+      const endpoint = `${apiUrl}/onboarding/companies/${companyId}/onboarding/phases/2/steps/7`;
+      console.log('Making request to endpoint:', endpoint);
+
+      const response = await axios.put(endpoint, { status: "completed" });
+
+      console.log('Onboarding progress update response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating onboarding progress:', error);
+      if (axios.isAxiosError(error)) {
+        console.error('Axios error details:', {
+          status: error.response?.status,
+          data: error.response?.data,
+          headers: error.response?.headers
+        });
+      }
+      throw error; // Re-throw to handle in the upload function
+    }
+  };
+
+  // Separate function to fetch documents and update state
+  const fetchAndUpdateDocuments = async () => {
+    try {
+      const userId = getUserId();
+      if (!userId) {
+        throw new Error('User ID not found');
+      }
+
+      const response = await apiClient.get('/documents', {
+        params: { userId }
+      });
+      console.log('Response fetching documents:', response);
+      
+      const documents = response.data.documents.map((doc: any) => ({
+        id: doc._id,
+        name: doc.name,
+        description: doc.description,
+        type: 'document',
+        fileUrl: doc.fileUrl,
+        uploadedAt: format(new Date(doc.uploadedAt), 'yyyy-MM-dd'),
+        uploadedBy: doc.uploadedBy,
+        tags: doc.tags,
+        usagePercentage: 0,
+        isPublic: true
+      }));
+      
+      // Check if there's more than one document (not first upload)
+      const hasMultipleDocuments = documents.length > 1;
+      console.log('Documents count:', documents.length);
+      console.log('Has multiple documents:', hasMultipleDocuments);
+      
+      setIsFirstUpload(!hasMultipleDocuments);
+      setKnowledgeItems(documents);
+      
+      // Return true if we have more than one document
+      return hasMultipleDocuments;
+    } catch (error) {
+      console.error('Error fetching documents:', error);
+      setIsFirstUpload(true);
+      return false;
+    }
+  };
+
+  // Initial fetch on component mount
+  useEffect(() => {
+    fetchAndUpdateDocuments();
   }, []);
 
   // Fetch call records from the backend
@@ -228,8 +277,6 @@ const KnowledgeBase: React.FC = () => {
         throw new Error('User ID not found');
       }
 
-      console.log('User ID:', userId);
-
       const formData = new FormData();
       formData.append('file', uploadFile);
       formData.append('name', uploadName);
@@ -238,24 +285,23 @@ const KnowledgeBase: React.FC = () => {
       formData.append('uploadedBy', 'Current User');
       formData.append('userId', userId);
 
+      // Upload the document
       const response = await apiClient.post('/documents/upload', formData);
+      console.log('Document upload successful:', response.data);
 
-      console.log('Upload result:', response.data);
-
-      const newItem: KnowledgeItem = {
-        id: response.data.document.id,
-        name: response.data.document.name,
-        description: response.data.document.description,
-        type: 'document',
-        fileUrl: response.data.document.fileUrl,
-        uploadedAt: format(new Date(), 'yyyy-MM-dd'),
-        uploadedBy: 'Current User',
-        tags: response.data.document.tags,
-        usagePercentage: 0,
-        isPublic: true
-      };
-
-      setKnowledgeItems(prevItems => [...prevItems, newItem]);
+      // Fetch latest documents to check if this was the first upload
+      const hasMultipleDocuments = await fetchAndUpdateDocuments();
+      
+      // If we don't have multiple documents yet, this is the first upload
+      if (!hasMultipleDocuments) {
+        console.log('Updating onboarding progress for first upload');
+        try {
+          await updateOnboardingProgress();
+          console.log('Successfully updated onboarding progress');
+        } catch (error) {
+          console.error('Failed to update onboarding progress:', error);
+        }
+      }
 
       // Reset form and close modal
       setUploadName('');
@@ -265,7 +311,7 @@ const KnowledgeBase: React.FC = () => {
       setUploadTags('');
       setShowUploadModal(false);
     } catch (error) {
-      console.error('Error uploading file:', error);
+      console.error('Error in handleSubmit:', error);
       alert('There was an error uploading your file. Please try again.');
     } finally {
       setIsUploading(false);

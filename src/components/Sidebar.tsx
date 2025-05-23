@@ -2,20 +2,34 @@ import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Users, Search, Tag, BarChart2, Settings, Brain, Home, FileText, MessageSquare, Zap, Building, UserPlus, Shield, ChevronDown, ChevronRight } from 'lucide-react';
 import { mockUsers } from '../data/mockData';
+import { OnboardingProgress, Phase } from '../types/onboarding';
+
+interface SidebarProps {
+  progress: OnboardingProgress | null;
+}
 
 // Get the current user (in a real app, this would come from authentication)
 const currentUser = mockUsers[0]; // Alex Morgan, admin at Acme Corporation
 
-const Sidebar: React.FC = () => {
+const Sidebar: React.FC<SidebarProps> = ({ progress }) => {
   const location = useLocation();
   const [adminMenuOpen, setAdminMenuOpen] = useState(false);
+
+  // Find phase 1 and check if step 3 is completed
+  const phase1 = progress?.phases.find(phase => phase.id === 1);
+  const step3 = phase1?.steps.find(step => step.id === 3);
+  const isPhase1Step3Completed = step3?.status === 'completed';
+
+  const canAccessOtherSections = progress && 
+    ((progress.currentPhase > 2) || 
+    (progress.currentPhase === 2 && isPhase1Step3Completed));
   
-  // Define navigation items based on user role
+  // Define navigation items based on user role and progress
   const navItems = [
     { path: '/', icon: <Home size={20} />, label: 'Dashboard', roles: ['admin', 'manager', 'rep'] },
     { path: '/contacts', icon: <Users size={20} />, label: 'Contacts', roles: ['admin', 'manager', 'rep'] },
     { path: '/search', icon: <Search size={20} />, label: 'AI Search', roles: ['admin', 'manager', 'rep'] },
-    { path: '/knowledge', icon: <FileText size={20} />, label: 'Knowledge Base', roles: ['admin', 'manager', 'rep'] },
+    { path: '/upload', icon: <FileText size={20} />, label: 'Knowledge Base', roles: ['admin', 'manager', 'rep'] },
     { path: '/knowledge-insights', icon: <Brain size={20} />, label: 'KB Insights', roles: ['admin', 'manager'] },
     { path: '/knowledge-query', icon: <MessageSquare size={20} />, label: 'Ask KB', roles: ['admin', 'manager', 'rep'] },
     { path: '/assistant', icon: <MessageSquare size={20} />, label: 'AI Assistant', roles: ['admin', 'manager', 'rep'] },
@@ -33,9 +47,17 @@ const Sidebar: React.FC = () => {
     { path: '/settings', icon: <Settings size={20} />, label: 'Settings', roles: ['admin', 'manager'] },
   ];
   
-  // Filter items based on user role
-  const filteredNavItems = navItems.filter(item => item.roles.includes(currentUser.role));
-  const filteredAdminItems = adminItems.filter(item => item.roles.includes(currentUser.role));
+  // Filter items based on user role and progress
+  const filteredNavItems = navItems.filter(item => {
+    const hasRole = item.roles.includes(currentUser.role);
+    if (item.path === '/upload') return hasRole; // Always show upload
+    return hasRole && canAccessOtherSections;
+  });
+
+  const filteredAdminItems = adminItems.filter(item => {
+    const hasRole = item.roles.includes(currentUser.role);
+    return hasRole && canAccessOtherSections;
+  });
 
   return (
     <div className="bg-gray-800 text-white w-64 flex-shrink-0 h-screen overflow-y-auto">
@@ -66,49 +88,54 @@ const Sidebar: React.FC = () => {
         </div>
       </div>
       
-      <nav className="mt-6">
-        <ul>
-          {filteredNavItems.map((item) => (
-            <li key={item.path}>
-              <Link
-                to={item.path}
-                className={`flex items-center space-x-3 px-4 py-3 hover:bg-gray-700 transition-colors ${
-                  location.pathname === item.path ? 'bg-gray-700 border-l-4 border-blue-400' : ''
-                }`}
-              >
-                <span className="text-gray-400">{item.icon}</span>
-                <span>{item.label}</span>
-              </Link>
-            </li>
-          ))}
-        </ul>
+      <nav className="mt-4">
+        {filteredNavItems.map((item) => (
+          <Link
+            key={item.path}
+            to={item.path}
+            className={`flex items-center px-4 py-2 text-sm ${
+              location.pathname === item.path
+                ? 'bg-gray-700 text-white'
+                : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+            }`}
+          >
+            {item.icon}
+            <span className="ml-3">{item.label}</span>
+          </Link>
+        ))}
         
         {filteredAdminItems.length > 0 && (
           <>
-            <div 
-              className="flex items-center justify-between px-4 py-3 text-gray-400 cursor-pointer hover:bg-gray-700"
+            <button
+              className="w-full flex items-center px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white"
               onClick={() => setAdminMenuOpen(!adminMenuOpen)}
             >
-              <span className="font-medium">Administration</span>
-              {adminMenuOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-            </div>
+              <Settings size={20} />
+              <span className="ml-3">Administration</span>
+              {adminMenuOpen ? (
+                <ChevronDown size={16} className="ml-auto" />
+              ) : (
+                <ChevronRight size={16} className="ml-auto" />
+              )}
+            </button>
             
             {adminMenuOpen && (
-              <ul>
+              <div className="bg-gray-900">
                 {filteredAdminItems.map((item) => (
-                  <li key={item.path}>
-                    <Link
-                      to={item.path}
-                      className={`flex items-center space-x-3 px-6 py-2 hover:bg-gray-700 transition-colors ${
-                        location.pathname === item.path ? 'bg-gray-700 border-l-4 border-blue-400' : ''
-                      }`}
-                    >
-                      <span className="text-gray-400">{item.icon}</span>
-                      <span className="text-sm">{item.label}</span>
-                    </Link>
-                  </li>
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    className={`flex items-center px-4 py-2 text-sm pl-11 ${
+                      location.pathname === item.path
+                        ? 'bg-gray-700 text-white'
+                        : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+                    }`}
+                  >
+                    {item.icon}
+                    <span className="ml-3">{item.label}</span>
+                  </Link>
                 ))}
-              </ul>
+              </div>
             )}
           </>
         )}
