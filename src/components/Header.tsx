@@ -1,12 +1,17 @@
 import React, { useState } from 'react';
 import { Bell, Search, User, ChevronDown, Building, LogOut, Settings } from 'lucide-react';
 import { mockUsers, mockCompanies } from '../data/mockData';
+import { OnboardingProgress } from '../types/onboarding';
+
+interface HeaderProps {
+  onboardingProgress: OnboardingProgress | null;
+}
 
 // Get the current user (in a real app, this would come from authentication)
 const currentUser = mockUsers[0]; // Alex Morgan, admin at Acme Corporation
 const currentCompany = mockCompanies.find(company => company.id === currentUser.companyId);
 
-const Header: React.FC = () => {
+const Header: React.FC<HeaderProps> = ({ onboardingProgress }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   

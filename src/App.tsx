@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import Cookies from 'js-cookie';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import Dashboard from './components/Dashboard';
@@ -14,49 +15,74 @@ import AugmentedLearning from './components/AugmentedLearning';
 import CompanyManagement from './components/CompanyManagement';
 import UserManagement from './components/UserManagement';
 import PermissionsManagement from './components/PermissionsManagement';
+import ProtectedRoute from './components/ProtectedRoute';
+import { OnboardingProgress } from './types/onboarding';
 
 // ⬇️ Ajoute le qiankun helper
 import { qiankunWindow } from 'vite-plugin-qiankun/dist/helper';
 
 function App() {
+  const isStandaloneMode = import.meta.env.VITE_RUN_MODE === 'standalone';
+  const basename = isStandaloneMode ? '/' : '/knowledgebase';
+  const [progress, setProgress] = useState<OnboardingProgress | null>(null);
+
+  useEffect(() => {
+    try {
+      const progressData = Cookies.get('companyOnboardingProgress');
+      if (progressData) {
+        const parsedProgress = JSON.parse(progressData);
+        setProgress(parsedProgress);
+        console.log('Loaded onboarding progress:', parsedProgress);
+      }
+    } catch (error) {
+      console.error('Error loading onboarding progress:', error);
+    }
+  }, []);
+
   return (
-    <Router basename={qiankunWindow.__POWERED_BY_QIANKUN__ ? '/knowledgebase' : '/'}>
+    <Router basename={basename}>
       <div className="flex h-screen bg-gray-50">
-        <Sidebar />
+        <Sidebar progress={progress} />
         <div className="flex-1 flex flex-col overflow-hidden">
-          <Header />
+          <Header onboardingProgress={progress} />
           <main className="flex-1 overflow-y-auto">
             <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/app9" element={<Dashboard />} />
-              <Route path="/contacts" element={<ContactsList />} />
-              <Route path="/search" element={<AISearch />} />
-              <Route path="/insights" element={<AIInsights />} />
-              <Route path="/knowledge" element={<KnowledgeBase />} />
-              <Route path="/knowledge-insights" element={<KnowledgeInsights />} />
-              <Route path="/knowledge-query" element={<KnowledgeQuery />} />
-              <Route path="/assistant" element={<AIAssistant />} />
-              <Route path="/augmented-learning" element={<AugmentedLearning />} />
-              <Route path="/companies" element={<CompanyManagement />} />
-              <Route path="/users" element={<UserManagement />} />
-              <Route path="/permissions" element={<PermissionsManagement />} />
+              <Route path="/upload" element={<KnowledgeBase />} />
+              <Route path="/" element={<ProtectedRoute element={<Dashboard />} />} />
+              <Route path="/app9" element={<ProtectedRoute element={<Dashboard />} />} />
+              <Route path="/contacts" element={<ProtectedRoute element={<ContactsList />} />} />
+              <Route path="/search" element={<ProtectedRoute element={<AISearch />} />} />
+              <Route path="/insights" element={<ProtectedRoute element={<AIInsights />} />} />
+              <Route path="/knowledge-insights" element={<ProtectedRoute element={<KnowledgeInsights />} />} />
+              <Route path="/knowledge-query" element={<ProtectedRoute element={<KnowledgeQuery />} />} />
+              <Route path="/assistant" element={<ProtectedRoute element={<AIAssistant />} />} />
+              <Route path="/augmented-learning" element={<ProtectedRoute element={<AugmentedLearning />} />} />
+              <Route path="/companies" element={<ProtectedRoute element={<CompanyManagement />} />} />
+              <Route path="/users" element={<ProtectedRoute element={<UserManagement />} />} />
+              <Route path="/permissions" element={<ProtectedRoute element={<PermissionsManagement />} />} />
               <Route path="/tags" element={
-                <div className="p-6">
-                  <h1 className="text-2xl font-bold">Tags Management</h1>
-                  <p className="mt-4">This feature is coming soon.</p>
-                </div>
+                <ProtectedRoute element={
+                  <div className="p-6">
+                    <h1 className="text-2xl font-bold">Tags Management</h1>
+                    <p className="mt-4">This feature is coming soon.</p>
+                  </div>
+                } />
               } />
               <Route path="/analytics" element={
-                <div className="p-6">
-                  <h1 className="text-2xl font-bold">Analytics</h1>
-                  <p className="mt-4">This feature is coming soon.</p>
-                </div>
+                <ProtectedRoute element={
+                  <div className="p-6">
+                    <h1 className="text-2xl font-bold">Analytics</h1>
+                    <p className="mt-4">This feature is coming soon.</p>
+                  </div>
+                } />
               } />
               <Route path="/settings" element={
-                <div className="p-6">
-                  <h1 className="text-2xl font-bold">Settings</h1>
-                  <p className="mt-4">This feature is coming soon.</p>
-                </div>
+                <ProtectedRoute element={
+                  <div className="p-6">
+                    <h1 className="text-2xl font-bold">Settings</h1>
+                    <p className="mt-4">This feature is coming soon.</p>
+                  </div>
+                } />
               } />
             </Routes>
           </main>
