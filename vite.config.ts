@@ -25,7 +25,7 @@ export default defineConfig(({ mode }) => {
       react({
         jsxRuntime: 'classic',
       }),
-      qiankun('app9', {
+      qiankun('knowledgebase', {
         useDevMode: true,
       }),
       removeReactRefreshScript(), // Add the script removal plugin
@@ -35,7 +35,7 @@ export default defineConfig(({ mode }) => {
       'import.meta.env': env,
     },
     server: {
-      port: 5180,
+      port: 5184,
       cors: true,
       hmr: false,
       fs: {
