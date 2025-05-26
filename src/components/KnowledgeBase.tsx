@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, File, FileText, Video, Link as LinkIcon, Plus, Search, Trash2, Filter, Download, Mic, Play, Clock, Pause, ChevronDown, ChevronUp, X, ExternalLink, Eye } from 'lucide-react';
+import { Upload, File, FileText, Video, Link as LinkIcon, Plus, Search, Trash2, Filter, Download, Mic, Play, Clock, Pause, ChevronDown, ChevronUp, X, ExternalLink, Eye, ArrowLeft } from 'lucide-react';
 import { format } from 'date-fns';
 import { KnowledgeItem, CallRecord } from '../types';
 import apiClient from '../api/client';
@@ -611,9 +611,22 @@ const KnowledgeBase: React.FC = () => {
     };
   }, []);
 
+  const handleBackToOrchestrator = () => {
+    const orchestratorUrl = import.meta.env.VITE_COMPANY_ORCHESTRATOR_URL;
+    window.location.href = orchestratorUrl;
+  };
+
   // Ensure the component returns a valid ReactNode
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
+      <button 
+        onClick={handleBackToOrchestrator}
+        className="mb-6 flex items-center text-gray-600 hover:text-gray-900 transition-colors"
+      >
+        <ArrowLeft size={20} className="mr-2" />
+        <span>Go back to orchestrator</span>
+      </button>
+
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-800 mb-2">Knowledge Base</h1>
         <p className="text-gray-600">
