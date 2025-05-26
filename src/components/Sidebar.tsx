@@ -15,14 +15,12 @@ const Sidebar: React.FC<SidebarProps> = ({ progress }) => {
   const location = useLocation();
   const [adminMenuOpen, setAdminMenuOpen] = useState(false);
 
-  // Find phase 1 and check if step 3 is completed
-  const phase1 = progress?.phases.find(phase => phase.id === 1);
-  const step3 = phase1?.steps.find(step => step.id === 3);
-  const isPhase1Step3Completed = step3?.status === 'completed';
+  // Check if step 7 is completed using completedSteps array
+  const isStep7Completed = progress?.completedSteps?.includes(7);
 
   const canAccessOtherSections = progress && 
     ((progress.currentPhase > 2) || 
-    (progress.currentPhase === 2 && isPhase1Step3Completed));
+    (progress.currentPhase === 2 && isStep7Completed));
   
   // Define navigation items based on user role and progress
   const navItems = [
@@ -64,28 +62,6 @@ const Sidebar: React.FC<SidebarProps> = ({ progress }) => {
       <div className="p-4 flex items-center space-x-2">
         <Brain size={24} className="text-blue-400" />
         <h1 className="text-xl font-bold">AI Knowledge Hub</h1>
-      </div>
-      
-      <div className="px-4 py-2">
-        <div className="bg-gray-700 rounded-lg p-3">
-          <div className="flex items-center">
-            <div className="bg-blue-500 p-2 rounded-full">
-              {currentUser.avatar ? (
-                <img 
-                  src={currentUser.avatar} 
-                  alt={currentUser.name} 
-                  className="h-6 w-6 rounded-full"
-                />
-              ) : (
-                <Users size={16} className="text-white" />
-              )}
-            </div>
-            <div className="ml-3">
-              <p className="text-sm font-medium text-white">{currentUser.name}</p>
-              <p className="text-xs text-gray-300 capitalize">{currentUser.role}</p>
-            </div>
-          </div>
-        </div>
       </div>
       
       <nav className="mt-4">
@@ -140,18 +116,6 @@ const Sidebar: React.FC<SidebarProps> = ({ progress }) => {
           </>
         )}
       </nav>
-      
-      <div className="p-4 mt-8">
-        <div className="bg-gray-700 p-3 rounded-lg">
-          <p className="text-sm text-gray-300">AI Assistant</p>
-          <p className="text-xs text-gray-400 mt-1">Get real-time help during customer calls</p>
-          <Link to="/assistant">
-            <button className="mt-2 w-full bg-blue-500 hover:bg-blue-600 text-white py-2 px-3 rounded-md text-sm transition-colors">
-              Open AI Assistant
-            </button>
-          </Link>
-        </div>
-      </div>
     </div>
   );
 };
