@@ -1623,25 +1623,55 @@ const KnowledgeBase: React.FC = () => {
       )}
 
       {/* Remplacer la section de la modale d'analyse par une nouvelle page d'analyse */}
-      {showAnalysisPage && selectedDocumentForAnalysis && (
-        <div className="fixed inset-0 bg-white z-50 overflow-y-auto">
-          <div className="max-w-7xl mx-auto px-4 py-8">
-            <div className="flex items-center justify-between mb-8">
-              <button
-                onClick={handleBackToList}
-                className="flex items-center text-gray-600 hover:text-gray-900"
-              >
-                <ArrowLeft size={20} className="mr-2" />
-                Back to Knowledge Base
-              </button>
-              <h1 className="text-2xl font-bold text-gray-900">Document Analysis</h1>
-            </div>
+      {showAnalysisPage && selectedDocumentForAnalysis ? (
+        <div className="p-6 relative">
+          {/* Bouton de fermeture en haut à droite */}
+          <button
+            onClick={handleBackToList}
+            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-2xl font-bold focus:outline-none"
+            title="Close details"
+          >
+            ×
+          </button>
 
-            <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center">
-                  {getItemIcon(selectedDocumentForAnalysis.type)}
-                  <h2 className="text-xl font-semibold ml-2">{selectedDocumentForAnalysis.name}</h2>
+          <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
+            {/* En-tête du document */}
+            <div className="border-b border-gray-200 pb-6 mb-6">
+              <div className="flex items-start justify-between">
+                <div className="flex items-start space-x-4">
+                  <div className="p-3 rounded-lg bg-gray-100">
+                    {getItemIcon(selectedDocumentForAnalysis.type)}
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-semibold text-gray-900 mb-2">
+                      {selectedDocumentForAnalysis.name}
+                    </h2>
+                    <p className="text-gray-600 mb-4">
+                      {selectedDocumentForAnalysis.description}
+                    </p>
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {selectedDocumentForAnalysis.tags.map((tag: string, index: number) => (
+                        <span 
+                          key={index}
+                          className="px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-sm"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                    <div className="flex items-center space-x-4">
+                      <button
+                        onClick={() => openInNewTab(selectedDocumentForAnalysis.fileUrl)}
+                        className="flex items-center text-blue-600 hover:text-blue-800"
+                      >
+                        <ExternalLink size={18} className="mr-2" />
+                        Open Document
+                      </button>
+                      <span className="text-sm text-gray-500">
+                        Uploaded on {format(new Date(selectedDocumentForAnalysis.uploadedAt), 'MMMM d, yyyy')}
+                      </span>
+                    </div>
+                  </div>
                 </div>
                 {analyzingDocument === selectedDocumentForAnalysis.id ? (
                   <div className="flex items-center text-blue-600">
@@ -1666,81 +1696,87 @@ const KnowledgeBase: React.FC = () => {
                   </button>
                 )}
               </div>
-
-              {documentAnalysis[selectedDocumentForAnalysis.id] ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="space-y-6">
-                    <div>
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">Summary</h3>
-                      <p className="text-gray-700">{documentAnalysis[selectedDocumentForAnalysis.id].summary}</p>
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">Domain</h3>
-                      <p className="text-gray-700">{documentAnalysis[selectedDocumentForAnalysis.id].domain}</p>
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">Theme</h3>
-                      <p className="text-gray-700">{documentAnalysis[selectedDocumentForAnalysis.id].theme}</p>
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">Technical Level</h3>
-                      <p className="text-gray-700">{documentAnalysis[selectedDocumentForAnalysis.id].technicalLevel}</p>
-                    </div>
-                  </div>
-                  <div className="space-y-6">
-                    <div>
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">Main Points</h3>
-                      <ul className="list-disc list-inside space-y-2">
-                        {Array.isArray(documentAnalysis[selectedDocumentForAnalysis.id].mainPoints) 
-                          ? documentAnalysis[selectedDocumentForAnalysis.id].mainPoints.map((point: string, index: number) => (
-                              <li key={index} className="text-gray-700">{point}</li>
-                            ))
-                          : <li className="text-gray-700">{documentAnalysis[selectedDocumentForAnalysis.id].mainPoints}</li>
-                        }
-                      </ul>
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">Target Audience</h3>
-                      <p className="text-gray-700">{documentAnalysis[selectedDocumentForAnalysis.id].targetAudience}</p>
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">Key Terms</h3>
-                      <ul className="list-disc list-inside space-y-2">
-                        {Array.isArray(documentAnalysis[selectedDocumentForAnalysis.id].keyTerms)
-                          ? documentAnalysis[selectedDocumentForAnalysis.id].keyTerms.map((term: string, index: number) => (
-                              <li key={index} className="text-gray-700">{term}</li>
-                            ))
-                          : <li className="text-gray-700">{documentAnalysis[selectedDocumentForAnalysis.id].keyTerms}</li>
-                        }
-                      </ul>
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">Recommendations</h3>
-                      <ul className="list-disc list-inside space-y-2">
-                        {Array.isArray(documentAnalysis[selectedDocumentForAnalysis.id].recommendations)
-                          ? documentAnalysis[selectedDocumentForAnalysis.id].recommendations.map((rec: string, index: number) => (
-                              <li key={index} className="text-gray-700">{rec}</li>
-                            ))
-                          : <li className="text-gray-700">{documentAnalysis[selectedDocumentForAnalysis.id].recommendations}</li>
-                        }
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center py-12">
-                  <Brain size={48} className="mx-auto text-gray-400 mb-4" />
-                  <p className="text-gray-500">
-                    Click "Start Analysis" to get AI-powered insights about this document.
-                    <br />
-                    <span className="text-sm text-gray-400 mt-2 block">
-                      This process may take a few minutes as it analyzes the document in detail.
-                    </span>
-                  </p>
-                </div>
-              )}
             </div>
+
+            {/* Contenu de l'analyse */}
+            {documentAnalysis[selectedDocumentForAnalysis.id] ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">Summary</h3>
+                    <p className="text-gray-700">{documentAnalysis[selectedDocumentForAnalysis.id].summary}</p>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">Domain</h3>
+                    <p className="text-gray-700">{documentAnalysis[selectedDocumentForAnalysis.id].domain}</p>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">Theme</h3>
+                    <p className="text-gray-700">{documentAnalysis[selectedDocumentForAnalysis.id].theme}</p>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">Technical Level</h3>
+                    <p className="text-gray-700">{documentAnalysis[selectedDocumentForAnalysis.id].technicalLevel}</p>
+                  </div>
+                </div>
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">Main Points</h3>
+                    <ul className="list-disc list-inside space-y-2">
+                      {Array.isArray(documentAnalysis[selectedDocumentForAnalysis.id].mainPoints) 
+                        ? documentAnalysis[selectedDocumentForAnalysis.id].mainPoints.map((point: string, index: number) => (
+                            <li key={index} className="text-gray-700">{point}</li>
+                          ))
+                        : <li className="text-gray-700">{documentAnalysis[selectedDocumentForAnalysis.id].mainPoints}</li>
+                      }
+                    </ul>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">Target Audience</h3>
+                    <p className="text-gray-700">{documentAnalysis[selectedDocumentForAnalysis.id].targetAudience}</p>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">Key Terms</h3>
+                    <ul className="list-disc list-inside space-y-2">
+                      {Array.isArray(documentAnalysis[selectedDocumentForAnalysis.id].keyTerms)
+                        ? documentAnalysis[selectedDocumentForAnalysis.id].keyTerms.map((term: string, index: number) => (
+                            <li key={index} className="text-gray-700">{term}</li>
+                          ))
+                        : <li className="text-gray-700">{documentAnalysis[selectedDocumentForAnalysis.id].keyTerms}</li>
+                      }
+                    </ul>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">Recommendations</h3>
+                    <ul className="list-disc list-inside space-y-2">
+                      {Array.isArray(documentAnalysis[selectedDocumentForAnalysis.id].recommendations)
+                        ? documentAnalysis[selectedDocumentForAnalysis.id].recommendations.map((rec: string, index: number) => (
+                            <li key={index} className="text-gray-700">{rec}</li>
+                          ))
+                        : <li className="text-gray-700">{documentAnalysis[selectedDocumentForAnalysis.id].recommendations}</li>
+                      }
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <Brain size={48} className="mx-auto text-gray-400 mb-4" />
+                <p className="text-gray-500">
+                  Click "Start Analysis" to get AI-powered insights about this document.
+                  <br />
+                  <span className="text-sm text-gray-400 mt-2 block">
+                    This process may take a few minutes as it analyzes the document in detail.
+                  </span>
+                </p>
+              </div>
+            )}
           </div>
+        </div>
+      ) : (
+        // Contenu original de la liste des documents
+        <div className="p-6">
+          {/* ... existing list content ... */}
         </div>
       )}
     </div>
