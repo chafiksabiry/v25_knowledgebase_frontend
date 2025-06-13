@@ -42,6 +42,8 @@ const KnowledgeBase: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [analyzingDocument, setAnalyzingDocument] = useState<string | null>(null);
   const [documentAnalysis, setDocumentAnalysis] = useState<{[key: string]: any}>({});
+  const [showAnalysisPage, setShowAnalysisPage] = useState(false);
+  const [selectedDocumentForAnalysis, setSelectedDocumentForAnalysis] = useState<any>(null);
   
   // Load items from localStorage on mount
   useEffect(() => {
@@ -411,33 +413,15 @@ const KnowledgeBase: React.FC = () => {
 
   // Modifier la fonction handleView pour récupérer l'analyse existante
   const handleView = async (item: any) => {
-    setSelectedItem(item);
-    setIsModalOpen(true);
-
-    // Si le document a déjà une analyse, on la récupère
-    if (item.analysis) {
-      setDocumentAnalysis(prev => ({
-        ...prev,
-        [item.id]: {
-          summary: item.analysis.summary,
-          domain: item.analysis.domain,
-          theme: item.analysis.theme,
-          mainPoints: item.analysis.mainPoints,
-          technicalLevel: item.analysis.technicalLevel,
-          targetAudience: item.analysis.targetAudience,
-          keyTerms: item.analysis.keyTerms,
-          recommendations: item.analysis.recommendations,
-          analyzedAt: item.analysis.analyzedAt
-        }
-      }));
-    }
+    setSelectedDocumentForAnalysis(item);
+    setShowAnalysisPage(true);
   };
 
   // Fonction pour analyser un document
   const analyzeDocument = async (documentId: string) => {
     try {
       setAnalyzingDocument(documentId);
-      const response = await apiClient.get(`/documents/${documentId}/analysis`);
+      const response = await apiClient.post(`/rag/analyze/${documentId}`);
       console.log('Analysis response:', response.data);
       setDocumentAnalysis(prev => ({
         ...prev,
@@ -661,6 +645,12 @@ const KnowledgeBase: React.FC = () => {
   const handleBackToOrchestrator = () => {
     const orchestratorUrl = import.meta.env.VITE_COMPANY_ORCHESTRATOR_URL;
     window.location.href = orchestratorUrl;
+  };
+
+  // Ajouter une fonction pour retourner à la liste
+  const handleBackToList = () => {
+    setShowAnalysisPage(false);
+    setSelectedDocumentForAnalysis(null);
   };
 
   // Ensure the component returns a valid ReactNode
@@ -1627,6 +1617,128 @@ const KnowledgeBase: React.FC = () => {
                   </>
                 )}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Remplacer la section de la modale d'analyse par une nouvelle page d'analyse */}
+      {showAnalysisPage && selectedDocumentForAnalysis && (
+        <div className="fixed inset-0 bg-white z-50 overflow-y-auto">
+          <div className="max-w-7xl mx-auto px-4 py-8">
+            <div className="flex items-center justify-between mb-8">
+              <button
+                onClick={handleBackToList}
+                className="flex items-center text-gray-600 hover:text-gray-900"
+              >
+                <ArrowLeft size={20} className="mr-2" />
+                Back to Knowledge Base
+              </button>
+              <h1 className="text-2xl font-bold text-gray-900">Document Analysis</h1>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center">
+                  {getItemIcon(selectedDocumentForAnalysis.type)}
+                  <h2 className="text-xl font-semibold ml-2">{selectedDocumentForAnalysis.name}</h2>
+                </div>
+                {analyzingDocument === selectedDocumentForAnalysis.id ? (
+                  <div className="flex items-center text-blue-600">
+                    <Loader2 className="animate-spin mr-2" size={20} />
+                    Analyzing... This may take a few minutes
+                  </div>
+                ) : !documentAnalysis[selectedDocumentForAnalysis.id] ? (
+                  <button
+                    onClick={() => analyzeDocument(selectedDocumentForAnalysis.id)}
+                    className="flex items-center text-blue-600 hover:text-blue-800"
+                  >
+                    <Brain size={20} className="mr-2" />
+                    Start Analysis
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => analyzeDocument(selectedDocumentForAnalysis.id)}
+                    className="flex items-center text-blue-600 hover:text-blue-800"
+                  >
+                    <RefreshCw size={20} className="mr-2" />
+                    Refresh Analysis
+                  </button>
+                )}
+              </div>
+
+              {documentAnalysis[selectedDocumentForAnalysis.id] ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">Summary</h3>
+                      <p className="text-gray-700">{documentAnalysis[selectedDocumentForAnalysis.id].summary}</p>
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">Domain</h3>
+                      <p className="text-gray-700">{documentAnalysis[selectedDocumentForAnalysis.id].domain}</p>
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">Theme</h3>
+                      <p className="text-gray-700">{documentAnalysis[selectedDocumentForAnalysis.id].theme}</p>
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">Technical Level</h3>
+                      <p className="text-gray-700">{documentAnalysis[selectedDocumentForAnalysis.id].technicalLevel}</p>
+                    </div>
+                  </div>
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">Main Points</h3>
+                      <ul className="list-disc list-inside space-y-2">
+                        {Array.isArray(documentAnalysis[selectedDocumentForAnalysis.id].mainPoints) 
+                          ? documentAnalysis[selectedDocumentForAnalysis.id].mainPoints.map((point: string, index: number) => (
+                              <li key={index} className="text-gray-700">{point}</li>
+                            ))
+                          : <li className="text-gray-700">{documentAnalysis[selectedDocumentForAnalysis.id].mainPoints}</li>
+                        }
+                      </ul>
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">Target Audience</h3>
+                      <p className="text-gray-700">{documentAnalysis[selectedDocumentForAnalysis.id].targetAudience}</p>
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">Key Terms</h3>
+                      <ul className="list-disc list-inside space-y-2">
+                        {Array.isArray(documentAnalysis[selectedDocumentForAnalysis.id].keyTerms)
+                          ? documentAnalysis[selectedDocumentForAnalysis.id].keyTerms.map((term: string, index: number) => (
+                              <li key={index} className="text-gray-700">{term}</li>
+                            ))
+                          : <li className="text-gray-700">{documentAnalysis[selectedDocumentForAnalysis.id].keyTerms}</li>
+                        }
+                      </ul>
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">Recommendations</h3>
+                      <ul className="list-disc list-inside space-y-2">
+                        {Array.isArray(documentAnalysis[selectedDocumentForAnalysis.id].recommendations)
+                          ? documentAnalysis[selectedDocumentForAnalysis.id].recommendations.map((rec: string, index: number) => (
+                              <li key={index} className="text-gray-700">{rec}</li>
+                            ))
+                          : <li className="text-gray-700">{documentAnalysis[selectedDocumentForAnalysis.id].recommendations}</li>
+                        }
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <Brain size={48} className="mx-auto text-gray-400 mb-4" />
+                  <p className="text-gray-500">
+                    Click "Start Analysis" to get AI-powered insights about this document.
+                    <br />
+                    <span className="text-sm text-gray-400 mt-2 block">
+                      This process may take a few minutes as it analyzes the document in detail.
+                    </span>
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>
