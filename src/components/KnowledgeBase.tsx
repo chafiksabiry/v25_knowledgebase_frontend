@@ -858,7 +858,7 @@ const KnowledgeBase: React.FC = () => {
             ))}
             {/* Panneau de détails sous la liste */}
             {selectedItem && (
-              <div className="bg-white rounded-lg shadow-lg border border-blue-200 mt-6 p-6 max-w-4xl mx-auto">
+              <div className="bg-white rounded-lg shadow-lg border border-blue-200 mt-6 p-6 w-full">
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex items-center">
                     <Mic size={20} className="text-purple-500" />
@@ -908,23 +908,33 @@ const KnowledgeBase: React.FC = () => {
                     </div>
                   </div>
                 </div>
-                {/* Affichage du résumé d'analyse si disponible */}
-                {documentAnalysis[selectedItem.id] && 'summary' in documentAnalysis[selectedItem.id] && (documentAnalysis[selectedItem.id] as CallAnalysis).summary?.keyIdeas?.length > 0 && (
-                  <div className="mt-6">
-                    <h4 className="text-lg font-semibold text-gray-900 mb-4">Call Analysis</h4>
-                    <div className="space-y-4">
-                      {(documentAnalysis[selectedItem.id] as CallAnalysis).summary.keyIdeas.map((idea, idx) => (
-                        <div key={idx} className="bg-gray-50 p-4 rounded-lg">
-                          <h5 className="font-medium text-gray-900 mb-2">{idea.title}</h5>
-                          <p className="text-gray-700">{idea.description}</p>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="mt-4 text-sm text-gray-500">
-                      Last updated: {format(new Date((documentAnalysis[selectedItem.id] as CallAnalysis).summary.lastUpdated), 'PPpp')}
-                    </div>
-                  </div>
-                )}
+                {/* Call Analysis Section */}
+                <div className="mt-6 w-full">
+                  <h2 className="text-2xl font-bold text-gray-800 mb-6">Call Analysis</h2>
+                  {/* Affichage uniquement dans Key Points */}
+                  {documentAnalysis[selectedItem.id] && 'summary' in documentAnalysis[selectedItem.id] && (documentAnalysis[selectedItem.id] as CallAnalysis).summary?.keyIdeas?.length > 0 && (
+                    <details className="mb-4" open>
+                      <summary className="cursor-pointer text-gray-700 font-semibold py-2">Key Points</summary>
+                      <div className="space-y-4 p-2">
+                        {(documentAnalysis[selectedItem.id] as CallAnalysis).summary.keyIdeas.map((idea, idx) => (
+                          <div key={idx} className="bg-gray-50 p-4 rounded-lg">
+                            <h5 className="font-medium text-gray-900 mb-2">{idea.title}</h5>
+                            <p className="text-gray-700">{idea.description}</p>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-4 text-sm text-gray-500">
+                        Last updated: {format(new Date((documentAnalysis[selectedItem.id] as CallAnalysis).summary.lastUpdated), 'PPpp')}
+                      </div>
+                    </details>
+                  )}
+                  {/* Collapsible sections for future analysis aspects */}
+                  <details className="mb-4">
+                    <summary className="cursor-pointer text-gray-700 font-semibold py-2">Sentiment Analysis (à venir)</summary>
+                    <div className="p-4 text-gray-500">Section pour l'analyse de sentiment à venir.</div>
+                  </details>
+                  {/* Ajouter d'autres sections collapsibles ici */}
+                </div>
               </div>
             )}
           </>
