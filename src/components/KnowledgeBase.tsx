@@ -911,29 +911,47 @@ const KnowledgeBase: React.FC = () => {
                 {/* Call Analysis Section */}
                 <div className="mt-6 w-full">
                   <h2 className="text-2xl font-bold text-gray-800 mb-6">Call Analysis</h2>
-                  {/* Affichage uniquement dans Key Points */}
-                  {documentAnalysis[selectedItem.id] && 'summary' in documentAnalysis[selectedItem.id] && (documentAnalysis[selectedItem.id] as CallAnalysis).summary?.keyIdeas?.length > 0 && (
-                    <details className="mb-4" open>
-                      <summary className="cursor-pointer text-gray-700 font-semibold py-2">Key Points</summary>
-                      <div className="space-y-4 p-2">
-                        {(documentAnalysis[selectedItem.id] as CallAnalysis).summary.keyIdeas.map((idea, idx) => (
-                          <div key={idx} className="bg-gray-50 p-4 rounded-lg">
-                            <h5 className="font-medium text-gray-900 mb-2">{idea.title}</h5>
-                            <p className="text-gray-700">{idea.description}</p>
+                  {/* Key Points Section: always visible */}
+                  <details className="mb-4" open>
+                    <summary className="cursor-pointer text-gray-700 font-semibold py-2">Key Points</summary>
+                    <div className="space-y-4 p-2">
+                      {analyzingDocument === selectedItem.id ? (
+                        <div className="flex items-center space-x-2 text-blue-600">
+                          <Loader2 className="animate-spin" size={20} />
+                          <span>Analyzing call, please wait...</span>
+                        </div>
+                      ) : documentAnalysis[selectedItem.id] && 'summary' in documentAnalysis[selectedItem.id] && (documentAnalysis[selectedItem.id] as CallAnalysis).summary?.keyIdeas?.length > 0 ? (
+                        <>
+                          {(documentAnalysis[selectedItem.id] as CallAnalysis).summary.keyIdeas.map((idea, idx) => (
+                            <div key={idx} className="bg-gray-50 p-4 rounded-lg">
+                              <h5 className="font-medium text-gray-900 mb-2">{idea.title}</h5>
+                              <p className="text-gray-700">{idea.description}</p>
+                            </div>
+                          ))}
+                          <div className="mt-4 text-sm text-gray-500">
+                            Last updated: {format(new Date((documentAnalysis[selectedItem.id] as CallAnalysis).summary.lastUpdated), 'PPpp')}
                           </div>
-                        ))}
-                      </div>
-                      <div className="mt-4 text-sm text-gray-500">
-                        Last updated: {format(new Date((documentAnalysis[selectedItem.id] as CallAnalysis).summary.lastUpdated), 'PPpp')}
-                      </div>
-                    </details>
-                  )}
-                  {/* Collapsible sections for future analysis aspects */}
+                        </>
+                      ) : (
+                        <div className="text-gray-500 italic">No analysis available yet.</div>
+                      )}
+                    </div>
+                  </details>
+                  {/* Collapsible sections for future analysis aspects: always visible, same logic */}
                   <details className="mb-4">
                     <summary className="cursor-pointer text-gray-700 font-semibold py-2">Sentiment Analysis (à venir)</summary>
-                    <div className="p-4 text-gray-500">Section pour l'analyse de sentiment à venir.</div>
+                    <div className="p-4">
+                      {analyzingDocument === selectedItem.id ? (
+                        <div className="flex items-center space-x-2 text-blue-600">
+                          <Loader2 className="animate-spin" size={20} />
+                          <span>Analyzing call, please wait...</span>
+                        </div>
+                      ) : (
+                        <div className="text-gray-500 italic">No analysis available yet.</div>
+                      )}
+                    </div>
                   </details>
-                  {/* Ajouter d'autres sections collapsibles ici */}
+                  {/* Ajouter d'autres sections collapsibles ici, même logique */}
                 </div>
               </div>
             )}
