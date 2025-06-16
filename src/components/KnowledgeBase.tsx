@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, File, FileText, Video, Link as LinkIcon, Plus, Search, Trash2, Filter, Download, Mic, Play, Clock, Pause, ChevronDown, ChevronUp, X, ExternalLink, Eye, ArrowLeft } from 'lucide-react';
+import { Upload, File, FileText, Video, Link as LinkIcon, Plus, Search, Trash2, Filter, Download, Mic, Play, Clock, Pause, ChevronDown, ChevronUp, X, ExternalLink, Eye, ArrowLeft, Brain, Loader2, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
 import { KnowledgeItem, CallRecord } from '../types';
 import apiClient from '../api/client';
@@ -40,6 +40,10 @@ const KnowledgeBase: React.FC = () => {
   });
   const [selectedItem, setSelectedItem] = useState<any | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [analyzingDocument, setAnalyzingDocument] = useState<string | null>(null);
+  const [documentAnalysis, setDocumentAnalysis] = useState<{[key: string]: any}>({});
+  const [showAnalysisPage, setShowAnalysisPage] = useState(false);
+  const [selectedDocumentForAnalysis, setSelectedDocumentForAnalysis] = useState<any>(null);
   
   // Load items from localStorage on mount
   useEffect(() => {
@@ -192,7 +196,8 @@ const KnowledgeBase: React.FC = () => {
         uploadedBy: doc.uploadedBy,
         tags: doc.tags,
         usagePercentage: 0,
-        isPublic: true
+        isPublic: true,
+        analysis: doc.analysis
       }));
       
       // Check if there's more than one document (not first upload)
@@ -202,6 +207,15 @@ const KnowledgeBase: React.FC = () => {
       
       setIsFirstUpload(!hasMultipleDocuments);
       setKnowledgeItems(documents);
+      
+      // Mettre à jour documentAnalysis avec les analyses existantes
+      const existingAnalyses = documents.reduce((acc: any, doc: any) => {
+        if (doc.analysis) {
+          acc[doc.id] = doc.analysis;
+        }
+        return acc;
+      }, {});
+      setDocumentAnalysis(existingAnalyses);
       
       // Return true if we have more than one document
       return hasMultipleDocuments;
@@ -309,7 +323,6 @@ const KnowledgeBase: React.FC = () => {
       setUploadUrl('');
       setUploadFile(null);
       setUploadTags('');
-      setShowUploadModal(false);
     } catch (error) {
       console.error('Error in handleSubmit:', error);
       alert('There was an error uploading your file. Please try again.');
@@ -398,10 +411,34 @@ const KnowledgeBase: React.FC = () => {
     }
   };
 
-  // Replace handleDownload with handleView
-  const handleView = (item: any) => {
-    setSelectedItem(item);
-    setIsModalOpen(true);
+  // Modifier la fonction handleView pour n'ouvrir le panneau de détails que pour les documents
+  const handleView = async (item: any) => {
+    if (activeTab === 'documents') {
+      setSelectedDocumentForAnalysis(item);
+      setShowAnalysisPage(true);
+    } else {
+      // Pour les call recordings, on peut ouvrir la modale de détails
+      setSelectedItem(item);
+      setIsModalOpen(true);
+    }
+  };
+
+  // Fonction pour analyser un document
+  const analyzeDocument = async (documentId: string) => {
+    try {
+      setAnalyzingDocument(documentId);
+      const response = await apiClient.post(`/rag/analyze/${documentId}`);
+      console.log('Analysis response:', response.data);
+      setDocumentAnalysis(prev => ({
+        ...prev,
+        [documentId]: response.data
+      }));
+    } catch (error) {
+      console.error('Error analyzing document:', error);
+      alert('Failed to analyze document. Please try again.');
+    } finally {
+      setAnalyzingDocument(null);
+    }
   };
 
   // Add function to open document/recording in new tab
@@ -614,6 +651,39 @@ const KnowledgeBase: React.FC = () => {
   const handleBackToOrchestrator = () => {
     const orchestratorUrl = import.meta.env.VITE_COMPANY_ORCHESTRATOR_URL;
     window.location.href = orchestratorUrl;
+  };
+
+  // Ajouter une fonction pour retourner à la liste
+  const handleBackToList = () => {
+    setShowAnalysisPage(false);
+    setSelectedDocumentForAnalysis(null);
+  };
+
+  // Ajouter les nouvelles fonctions d'analyse
+  const analyzeCallRecording = async (recordingId: string) => {
+    try {
+      setAnalyzingDocument(recordingId);
+      
+      // Appeler les deux endpoints d'analyse
+      const [summaryResponse, scoringResponse] = await Promise.all([
+        apiClient.post(`/call-recordings/${recordingId}/analyze/summary`),
+        apiClient.post(`/call-recordings/${recordingId}/analyze/scoring`)
+      ]);
+
+      // Mettre à jour l'état avec les résultats
+      setDocumentAnalysis(prev => ({
+        ...prev,
+        [recordingId]: {
+          summary: summaryResponse.data,
+          scoring: scoringResponse.data
+        }
+      }));
+    } catch (error) {
+      console.error('Error analyzing call recording:', error);
+      alert('Failed to analyze call recording. Please try again.');
+    } finally {
+      setAnalyzingDocument(null);
+    }
   };
 
   // Ensure the component returns a valid ReactNode
@@ -1319,7 +1389,7 @@ const KnowledgeBase: React.FC = () => {
       {/* Add Modal for Document/Call Recording Details */}
       {isModalOpen && selectedItem && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex justify-between items-start mb-4">
                 <div className="flex items-center">
@@ -1336,7 +1406,7 @@ const KnowledgeBase: React.FC = () => {
                 </button>
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-6">
                 {activeTab === 'documents' ? (
                   <>
                     <div>
@@ -1386,6 +1456,87 @@ const KnowledgeBase: React.FC = () => {
                         Open Document
                       </button>
                     </div>
+
+                    {/* Section d'analyse */}
+                    <div className="border-t border-gray-200 pt-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <h4 className="text-lg font-semibold text-gray-900">Document Analysis</h4>
+                        {analyzingDocument === selectedItem.id ? (
+                          <div className="flex items-center text-blue-600">
+                            <Loader2 className="animate-spin mr-2" size={20} />
+                            Analyzing... This may take a few minutes
+                          </div>
+                        ) : !documentAnalysis[selectedItem.id] ? (
+                          <button
+                            onClick={() => analyzeDocument(selectedItem.id)}
+                            className="flex items-center text-blue-600 hover:text-blue-800"
+                          >
+                            <Brain size={20} className="mr-2" />
+                            Start Analysis
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => analyzeDocument(selectedItem.id)}
+                            className="flex items-center text-blue-600 hover:text-blue-800"
+                          >
+                            <RefreshCw size={20} className="mr-2" />
+                            Refresh Analysis
+                          </button>
+                        )}
+                      </div>
+
+                      {documentAnalysis[selectedItem.id] ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="space-y-4">
+                            <div>
+                              <h5 className="text-sm font-medium text-gray-500">Summary</h5>
+                              <p className="mt-1 text-gray-900">{documentAnalysis[selectedItem.id].summary}</p>
+                            </div>
+                            <div>
+                              <h5 className="text-sm font-medium text-gray-500">Domain</h5>
+                              <p className="mt-1 text-gray-900">{documentAnalysis[selectedItem.id].domain}</p>
+                            </div>
+                            <div>
+                              <h5 className="text-sm font-medium text-gray-500">Theme</h5>
+                              <p className="mt-1 text-gray-900">{documentAnalysis[selectedItem.id].theme}</p>
+                            </div>
+                            <div>
+                              <h5 className="text-sm font-medium text-gray-500">Technical Level</h5>
+                              <p className="mt-1 text-gray-900">{documentAnalysis[selectedItem.id].technicalLevel}</p>
+                            </div>
+                          </div>
+                          <div className="space-y-4">
+                            <div>
+                              <h5 className="text-sm font-medium text-gray-500">Main Points</h5>
+                              <p className="mt-1 text-gray-900">{documentAnalysis[selectedItem.id].mainPoints}</p>
+                            </div>
+                            <div>
+                              <h5 className="text-sm font-medium text-gray-500">Target Audience</h5>
+                              <p className="mt-1 text-gray-900">{documentAnalysis[selectedItem.id].targetAudience}</p>
+                            </div>
+                            <div>
+                              <h5 className="text-sm font-medium text-gray-500">Key Terms</h5>
+                              <p className="mt-1 text-gray-900">{documentAnalysis[selectedItem.id].keyTerms}</p>
+                            </div>
+                            <div>
+                              <h5 className="text-sm font-medium text-gray-500">Recommendations</h5>
+                              <p className="mt-1 text-gray-900">{documentAnalysis[selectedItem.id].recommendations}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-center py-8">
+                          <Brain size={48} className="mx-auto text-gray-400 mb-4" />
+                          <p className="text-gray-500">
+                            Click "Start Analysis" to get AI-powered insights about this document.
+                            <br />
+                            <span className="text-sm text-gray-400 mt-2 block">
+                              This process may take a few minutes as it analyzes the document in detail.
+                            </span>
+                          </p>
+                        </div>
+                      )}
+                    </div>
                   </>
                 ) : (
                   <>
@@ -1419,22 +1570,6 @@ const KnowledgeBase: React.FC = () => {
                               {tag}
                             </span>
                           ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {selectedItem.aiInsights && selectedItem.aiInsights.length > 0 && (
-                      <div>
-                        <label className="text-sm font-medium text-gray-500">AI Insights</label>
-                        <div className="mt-1 p-3 bg-gray-50 rounded-lg">
-                          <ul className="space-y-2 text-sm text-gray-700">
-                            {selectedItem.aiInsights.map((insight: string, index: number) => (
-                              <li key={index} className="flex items-start">
-                                <span className="mr-2">•</span>
-                                <span>{insight}</span>
-                              </li>
-                            ))}
-                          </ul>
                         </div>
                       </div>
                     )}
@@ -1481,21 +1616,145 @@ const KnowledgeBase: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Sentiment at the bottom */}
-                    {selectedItem.sentiment && (
-                      <div className="mt-4">
-                        <label className="text-sm font-medium text-gray-500">Sentiment</label>
-                        <div className="mt-1">
-                          <span className={`px-3 py-1.5 inline-flex text-sm rounded-full ${
-                            selectedItem.sentiment === 'positive' ? 'bg-green-100 text-green-800' : 
-                            selectedItem.sentiment === 'negative' ? 'bg-red-100 text-red-800' : 
-                            'bg-gray-100 text-gray-800'
-                          }`}>
-                            {selectedItem.sentiment.charAt(0).toUpperCase() + selectedItem.sentiment.slice(1)} Sentiment
-                          </span>
-                        </div>
+                    {/* Section d'analyse */}
+                    <div className="border-t border-gray-200 pt-6 mt-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <h4 className="text-lg font-semibold text-gray-900">Call Analysis</h4>
+                        {analyzingDocument === selectedItem.id ? (
+                          <div className="flex items-center text-blue-600">
+                            <Loader2 className="animate-spin mr-2" size={20} />
+                            Analyzing... This may take a few minutes
+                          </div>
+                        ) : !documentAnalysis[selectedItem.id] ? (
+                          <button
+                            onClick={() => analyzeCallRecording(selectedItem.id)}
+                            className="flex items-center text-blue-600 hover:text-blue-800"
+                          >
+                            <Brain size={20} className="mr-2" />
+                            Start Analysis
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => analyzeCallRecording(selectedItem.id)}
+                            className="flex items-center text-blue-600 hover:text-blue-800"
+                          >
+                            <RefreshCw size={20} className="mr-2" />
+                            Refresh Analysis
+                          </button>
+                        )}
                       </div>
-                    )}
+
+                      {documentAnalysis[selectedItem.id] ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          {/* Résumé de l'appel */}
+                          <div className="space-y-4">
+                            <div>
+                              <h5 className="text-sm font-medium text-gray-500">Call Summary</h5>
+                              <p className="mt-1 text-gray-900">{documentAnalysis[selectedItem.id].summary.summary}</p>
+                            </div>
+                            <div>
+                              <h5 className="text-sm font-medium text-gray-500">Key Points</h5>
+                              <ul className="mt-1 text-gray-900 list-disc list-inside">
+                                {documentAnalysis[selectedItem.id].summary.keyPoints.map((point: string, index: number) => (
+                                  <li key={index}>{point}</li>
+                                ))}
+                              </ul>
+                            </div>
+                            <div>
+                              <h5 className="text-sm font-medium text-gray-500">Action Items</h5>
+                              <ul className="mt-1 text-gray-900 list-disc list-inside">
+                                {documentAnalysis[selectedItem.id].summary.actionItems.map((item: string, index: number) => (
+                                  <li key={index}>{item}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          </div>
+
+                          {/* Scoring de l'appel */}
+                          <div className="space-y-4">
+                            <div>
+                              <h5 className="text-sm font-medium text-gray-500">Call Scoring</h5>
+                              <div className="mt-2 space-y-3">
+                                <div>
+                                  <div className="flex justify-between mb-1">
+                                    <span className="text-sm text-gray-600">Agent Fluency</span>
+                                    <span className="text-sm font-medium text-gray-900">
+                                      {documentAnalysis[selectedItem.id].scoring.agentFluency.score}%
+                                    </span>
+                                  </div>
+                                  <div className="w-full bg-gray-200 rounded-full h-2">
+                                    <div 
+                                      className="bg-blue-600 h-2 rounded-full"
+                                      style={{ width: `${documentAnalysis[selectedItem.id].scoring.agentFluency.score}%` }}
+                                    />
+                                  </div>
+                                  <p className="mt-1 text-sm text-gray-600">{documentAnalysis[selectedItem.id].scoring.agentFluency.feedback}</p>
+                                </div>
+
+                                <div>
+                                  <div className="flex justify-between mb-1">
+                                    <span className="text-sm text-gray-600">Sentiment Analysis</span>
+                                    <span className="text-sm font-medium text-gray-900">
+                                      {documentAnalysis[selectedItem.id].scoring.sentimentAnalysis.score}%
+                                    </span>
+                                  </div>
+                                  <div className="w-full bg-gray-200 rounded-full h-2">
+                                    <div 
+                                      className="bg-blue-600 h-2 rounded-full"
+                                      style={{ width: `${documentAnalysis[selectedItem.id].scoring.sentimentAnalysis.score}%` }}
+                                    />
+                                  </div>
+                                  <p className="mt-1 text-sm text-gray-600">{documentAnalysis[selectedItem.id].scoring.sentimentAnalysis.feedback}</p>
+                                </div>
+
+                                <div>
+                                  <div className="flex justify-between mb-1">
+                                    <span className="text-sm text-gray-600">Fraud Detection</span>
+                                    <span className="text-sm font-medium text-gray-900">
+                                      {documentAnalysis[selectedItem.id].scoring.fraudDetection.score}%
+                                    </span>
+                                  </div>
+                                  <div className="w-full bg-gray-200 rounded-full h-2">
+                                    <div 
+                                      className="bg-blue-600 h-2 rounded-full"
+                                      style={{ width: `${documentAnalysis[selectedItem.id].scoring.fraudDetection.score}%` }}
+                                    />
+                                  </div>
+                                  <p className="mt-1 text-sm text-gray-600">{documentAnalysis[selectedItem.id].scoring.fraudDetection.feedback}</p>
+                                </div>
+
+                                <div>
+                                  <div className="flex justify-between mb-1">
+                                    <span className="text-sm text-gray-600">Overall Score</span>
+                                    <span className="text-sm font-medium text-gray-900">
+                                      {documentAnalysis[selectedItem.id].scoring.overall.score}%
+                                    </span>
+                                  </div>
+                                  <div className="w-full bg-gray-200 rounded-full h-2">
+                                    <div 
+                                      className="bg-blue-600 h-2 rounded-full"
+                                      style={{ width: `${documentAnalysis[selectedItem.id].scoring.overall.score}%` }}
+                                    />
+                                  </div>
+                                  <p className="mt-1 text-sm text-gray-600">{documentAnalysis[selectedItem.id].scoring.overall.feedback}</p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-center py-8">
+                          <Brain size={48} className="mx-auto text-gray-400 mb-4" />
+                          <p className="text-gray-500">
+                            Click "Start Analysis" to get AI-powered insights about this call recording.
+                            <br />
+                            <span className="text-sm text-gray-400 mt-2 block">
+                              This process may take a few minutes as it analyzes the call in detail.
+                            </span>
+                          </p>
+                        </div>
+                      )}
+                    </div>
                   </>
                 )}
               </div>
@@ -1503,8 +1762,162 @@ const KnowledgeBase: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Remplacer la section de la modale d'analyse par une nouvelle page d'analyse */}
+      {activeTab === 'documents' && showAnalysisPage && selectedDocumentForAnalysis && (
+        <div className="p-6 relative">
+          {/* Bouton de fermeture en haut à droite */}
+          <button
+            onClick={handleBackToList}
+            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-2xl font-bold focus:outline-none"
+            title="Close details"
+          >
+            ×
+          </button>
+
+          <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
+            {/* En-tête du document */}
+            <div className="border-b border-gray-200 pb-6 mb-6">
+              <div className="flex items-start justify-between">
+                <div className="flex items-start space-x-4">
+                  <div className="p-3 rounded-lg bg-gray-100">
+                    {getItemIcon(selectedDocumentForAnalysis.type)}
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-semibold text-gray-900 mb-2">
+                      {selectedDocumentForAnalysis.name}
+                    </h2>
+                    <p className="text-gray-600 mb-4">
+                      {selectedDocumentForAnalysis.description}
+                    </p>
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {selectedDocumentForAnalysis.tags.map((tag: string, index: number) => (
+                        <span 
+                          key={index}
+                          className="px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-sm"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                    <div className="flex items-center space-x-4">
+                      <button
+                        onClick={() => openInNewTab(selectedDocumentForAnalysis.fileUrl)}
+                        className="flex items-center text-blue-600 hover:text-blue-800"
+                      >
+                        <ExternalLink size={18} className="mr-2" />
+                        Open Document
+                      </button>
+                      <span className="text-sm text-gray-500">
+                        Uploaded on {format(new Date(selectedDocumentForAnalysis.uploadedAt), 'MMMM d, yyyy')}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                {analyzingDocument === selectedDocumentForAnalysis.id ? (
+                  <div className="flex items-center text-blue-600">
+                    <Loader2 className="animate-spin mr-2" size={20} />
+                    Analyzing... This may take a few minutes
+                  </div>
+                ) : !documentAnalysis[selectedDocumentForAnalysis.id] ? (
+                  <button
+                    onClick={() => analyzeDocument(selectedDocumentForAnalysis.id)}
+                    className="flex items-center text-blue-600 hover:text-blue-800"
+                  >
+                    <Brain size={20} className="mr-2" />
+                    Start Analysis
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => analyzeDocument(selectedDocumentForAnalysis.id)}
+                    className="flex items-center text-blue-600 hover:text-blue-800"
+                  >
+                    <RefreshCw size={20} className="mr-2" />
+                    Refresh Analysis
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Contenu de l'analyse */}
+            {documentAnalysis[selectedDocumentForAnalysis.id] ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">Summary</h3>
+                    <p className="text-gray-700">{documentAnalysis[selectedDocumentForAnalysis.id].summary}</p>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">Domain</h3>
+                    <p className="text-gray-700">{documentAnalysis[selectedDocumentForAnalysis.id].domain}</p>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">Theme</h3>
+                    <p className="text-gray-700">{documentAnalysis[selectedDocumentForAnalysis.id].theme}</p>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">Technical Level</h3>
+                    <p className="text-gray-700">{documentAnalysis[selectedDocumentForAnalysis.id].technicalLevel}</p>
+                  </div>
+                </div>
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">Main Points</h3>
+                    <ul className="list-disc list-inside space-y-2">
+                      {Array.isArray(documentAnalysis[selectedDocumentForAnalysis.id].mainPoints) 
+                        ? documentAnalysis[selectedDocumentForAnalysis.id].mainPoints.map((point: string, index: number) => (
+                            <li key={index} className="text-gray-700">{point}</li>
+                          ))
+                        : <li className="text-gray-700">{documentAnalysis[selectedDocumentForAnalysis.id].mainPoints}</li>
+                      }
+                    </ul>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">Target Audience</h3>
+                    <p className="text-gray-700">{documentAnalysis[selectedDocumentForAnalysis.id].targetAudience}</p>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">Key Terms</h3>
+                    <ul className="list-disc list-inside space-y-2">
+                      {Array.isArray(documentAnalysis[selectedDocumentForAnalysis.id].keyTerms)
+                        ? documentAnalysis[selectedDocumentForAnalysis.id].keyTerms.map((term: string, index: number) => (
+                            <li key={index} className="text-gray-700">{term}</li>
+                          ))
+                        : <li className="text-gray-700">{documentAnalysis[selectedDocumentForAnalysis.id].keyTerms}</li>
+                      }
+                    </ul>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">Recommendations</h3>
+                    <ul className="list-disc list-inside space-y-2">
+                      {Array.isArray(documentAnalysis[selectedDocumentForAnalysis.id].recommendations)
+                        ? documentAnalysis[selectedDocumentForAnalysis.id].recommendations.map((rec: string, index: number) => (
+                            <li key={index} className="text-gray-700">{rec}</li>
+                          ))
+                        : <li className="text-gray-700">{documentAnalysis[selectedDocumentForAnalysis.id].recommendations}</li>
+                      }
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <Brain size={48} className="mx-auto text-gray-400 mb-4" />
+                <p className="text-gray-500">
+                  Click "Start Analysis" to get AI-powered insights about this document.
+                  <br />
+                  <span className="text-sm text-gray-400 mt-2 block">
+                    This process may take a few minutes as it analyzes the document in detail.
+                  </span>
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
+
 
 export default KnowledgeBase;
