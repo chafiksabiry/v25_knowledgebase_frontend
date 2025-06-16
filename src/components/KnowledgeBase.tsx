@@ -411,10 +411,15 @@ const KnowledgeBase: React.FC = () => {
     }
   };
 
-  // Modifier la fonction handleView pour récupérer l'analyse existante
+  // Modifier la fonction handleView pour n'ouvrir le panneau de détails que pour les documents
   const handleView = async (item: any) => {
-    setSelectedDocumentForAnalysis(item);
-    setShowAnalysisPage(true);
+    if (activeTab === 'documents') {
+      setSelectedDocumentForAnalysis(item);
+      setShowAnalysisPage(true);
+    } else {
+      // Optionnel : gérer l'affichage des détails pour les call recordings ici si besoin
+      // Par défaut, ne rien faire
+    }
   };
 
   // Fonction pour analyser un document
@@ -1623,7 +1628,7 @@ const KnowledgeBase: React.FC = () => {
       )}
 
       {/* Remplacer la section de la modale d'analyse par une nouvelle page d'analyse */}
-      {showAnalysisPage && selectedDocumentForAnalysis ? (
+      {activeTab === 'documents' && showAnalysisPage && selectedDocumentForAnalysis ? (
         <div className="p-6 relative">
           {/* Bouton de fermeture en haut à droite */}
           <button
@@ -1773,14 +1778,10 @@ const KnowledgeBase: React.FC = () => {
             )}
           </div>
         </div>
-      ) : (
-        // Contenu original de la liste des documents
-        <div className="p-6">
-          {/* ... existing list content ... */}
-        </div>
-      )}
+      ) : null}
     </div>
   );
 };
+
 
 export default KnowledgeBase;
