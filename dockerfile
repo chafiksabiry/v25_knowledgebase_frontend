@@ -12,10 +12,8 @@ ENV VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 ENV VITE_SUPABASE_URL=https://xpcvybsumglycoujzxts.supabase.co
 ENV VITE_RUN_MODE=in-app
 ENV VITE_COMPANY_ORCHESTRATOR_URL=/app11
-#VITE_RUN_MODE=standalone
 ENV VITE_API_URL_ONBOARDING=https://preprod-api-companysearchwizard.harx.ai/api
 
-ENV VITE_STANDALONE_USER_ID=6808ef00413780df329d8833
 
 RUN npm run build
 

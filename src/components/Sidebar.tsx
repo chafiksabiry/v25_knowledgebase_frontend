@@ -14,13 +14,14 @@ const currentUser = mockUsers[0]; // Alex Morgan, admin at Acme Corporation
 const Sidebar: React.FC<SidebarProps> = ({ progress }) => {
   const location = useLocation();
   const [adminMenuOpen, setAdminMenuOpen] = useState(false);
+  const isInAppMode = import.meta.env.VITE_RUN_MODE === 'in-app';
 
   // Check if step 7 is completed using completedSteps array
   const isStep7Completed = progress?.completedSteps?.includes(7);
 
-  const canAccessOtherSections = progress && 
+  const canAccessOtherSections = !isInAppMode || (progress && 
     ((progress.currentPhase > 2) || 
-    (progress.currentPhase === 2 && isStep7Completed));
+    (progress.currentPhase === 2 && isStep7Completed)));
   
   // Define navigation items based on user role and progress
   const navItems = [
