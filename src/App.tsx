@@ -23,28 +23,32 @@ import { qiankunWindow } from 'vite-plugin-qiankun/dist/helper';
 
 function App() {
   const isStandaloneMode = import.meta.env.VITE_RUN_MODE === 'standalone';
+  const isInAppMode = import.meta.env.VITE_RUN_MODE === 'in-app';
   const basename = isStandaloneMode ? '/' : '/knowledgebase';
   const [progress, setProgress] = useState<OnboardingProgress | null>(null);
 
   useEffect(() => {
-    try {
-      const progressData = Cookies.get('companyOnboardingProgress');
-      if (progressData) {
-        const parsedProgress = JSON.parse(progressData);
-        setProgress(parsedProgress);
-        console.log('Loaded onboarding progress:', parsedProgress);
+    // Only fetch and set progress if in in-app mode
+    if (isInAppMode) {
+      try {
+        const progressData = Cookies.get('companyOnboardingProgress');
+        if (progressData) {
+          const parsedProgress = JSON.parse(progressData);
+          setProgress(parsedProgress);
+          console.log('Loaded onboarding progress:', parsedProgress);
+        }
+      } catch (error) {
+        console.error('Error loading onboarding progress:', error);
       }
-    } catch (error) {
-      console.error('Error loading onboarding progress:', error);
     }
-  }, []);
+  }, [isInAppMode]);
 
   return (
     <Router basename={basename}>
       <div className="flex h-screen bg-gray-50">
-        <Sidebar progress={progress} />
+        <Sidebar progress={isInAppMode ? progress : null} />
         <div className="flex-1 flex flex-col overflow-hidden">
-          <Header onboardingProgress={progress} />
+          <Header onboardingProgress={isInAppMode ? progress : null} />
           <main className="flex-1 overflow-y-auto">
             <Routes>
               <Route path="/upload" element={<KnowledgeBase />} />

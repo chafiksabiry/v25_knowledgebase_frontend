@@ -9,6 +9,13 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ element, requiresOnboarding = true }) => {
+  const isInAppMode = import.meta.env.VITE_RUN_MODE === 'in-app';
+  
+  // If not in in-app mode, return the element without restrictions
+  if (!isInAppMode) {
+    return element;
+  }
+
   const progressData = Cookies.get('companyOnboardingProgress');
   let progress: OnboardingProgress | null = null;
 
