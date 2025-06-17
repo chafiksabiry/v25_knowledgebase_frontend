@@ -465,7 +465,9 @@ const KnowledgeBase: React.FC = () => {
     if (activeTab === 'documents') {
       setSelectedDocumentForAnalysis(item);
       setShowAnalysisPage(true);
-      await analyzeDocument(item.id);
+      if (!documentAnalysis[item.id]) {
+        await analyzeDocument(item.id);
+      }
     } else {
       // Pour les call recordings, on peut ouvrir la modale de détails
       setSelectedItem(item);
