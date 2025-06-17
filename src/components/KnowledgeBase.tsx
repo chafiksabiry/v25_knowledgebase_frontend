@@ -371,6 +371,7 @@ const KnowledgeBase: React.FC = () => {
       setUploadUrl('');
       setUploadFile(null);
       setUploadTags('');
+      setShowUploadModal(false);
     } catch (error) {
       console.error('Error in handleSubmit:', error);
       alert('There was an error uploading your file. Please try again.');
@@ -1575,7 +1576,7 @@ const KnowledgeBase: React.FC = () => {
           </div>
         </div>
       );
-    } else {
+    } else if ('summary' in analysis && analysis.summary && 'keyIdeas' in analysis.summary) {
       // This is a CallAnalysis
       const callAnalysis = analysis as CallAnalysis;
       return (
@@ -1596,6 +1597,8 @@ const KnowledgeBase: React.FC = () => {
           </div>
         </div>
       );
+    } else {
+      return <div className="text-gray-500 italic">No analysis available yet.</div>;
     }
   };
 
