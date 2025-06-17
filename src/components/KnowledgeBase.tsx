@@ -29,8 +29,23 @@ interface CallSummary {
   lastUpdated: string;
 }
 
+interface TranscriptionSegment {
+  start: number;
+  end: number;
+  speaker: string;
+  text: string;
+}
+
+interface Transcription {
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  segments: TranscriptionSegment[];
+  lastUpdated: string;
+  error: string | null;
+}
+
 interface CallAnalysis {
   summary: CallSummary;
+  transcription?: Transcription;
 }
 
 type AnalysisResult = DocumentAnalysis | CallAnalysis;
@@ -72,6 +87,10 @@ const KnowledgeBase: React.FC = () => {
   const [documentAnalysis, setDocumentAnalysis] = useState<{[key: string]: AnalysisResult}>({});
   const [showAnalysisPage, setShowAnalysisPage] = useState(false);
   const [selectedDocumentForAnalysis, setSelectedDocumentForAnalysis] = useState<any>(null);
+  const [loadingSummary, setLoadingSummary] = useState<{[key: string]: boolean}>({});
+  const [loadingTranscription, setLoadingTranscription] = useState<{[key: string]: boolean}>({});
+  const [transcriptionShowCount, setTranscriptionShowCount] = useState<{[key: string]: number}>({});
+  const TRANSCRIPTION_PAGE_SIZE = 5;
   
   // Load items from localStorage on mount
   useEffect(() => {
@@ -439,17 +458,57 @@ const KnowledgeBase: React.FC = () => {
     }
   };
 
-  // Modifier la fonction handleView pour n'ouvrir le panneau de détails que pour les documents
+  // Refactor handleView to fetch summary and transcription separately
   const handleView = async (item: any) => {
-    if (isDocumentsTab(activeTab)) {
-      setSelectedDocumentForAnalysis(item);
-      setShowAnalysisPage(true);
-    } else {
-      setSelectedItem(item);
-      setIsModalOpen(true);
-      // Lancer l'analyse automatiquement lors de l'ouverture des détails
-      if (!documentAnalysis[item.id]) {
-        await analyzeCallRecording(item.id);
+    setSelectedItem(item);
+    setIsModalOpen(true);
+    // Fetch summary
+    if (!documentAnalysis[item.id] || !(documentAnalysis[item.id] as CallAnalysis).summary) {
+      setLoadingSummary(prev => ({ ...prev, [item.id]: true }));
+      try {
+        const summaryResponse = await apiClient.post(`/call-recordings/${item.id}/analyze/summary`);
+        setDocumentAnalysis(prev => ({
+          ...prev,
+          [item.id]: {
+            ...(prev[item.id] || {}),
+            summary: summaryResponse.data.summary
+          }
+        }));
+      } catch (error) {
+        setDocumentAnalysis(prev => ({
+          ...prev,
+          [item.id]: {
+            ...(prev[item.id] || {}),
+            summary: { keyIdeas: [], lastUpdated: null, error: 'Failed to load summary.' }
+          }
+        }));
+      } finally {
+        setLoadingSummary(prev => ({ ...prev, [item.id]: false }));
+      }
+    }
+    // Fetch transcription
+    if (!documentAnalysis[item.id] || !(documentAnalysis[item.id] as CallAnalysis).transcription) {
+      setLoadingTranscription(prev => ({ ...prev, [item.id]: true }));
+      try {
+        const transcriptionResponse = await apiClient.post(`/call-recordings/${item.id}/analyze/transcription`);
+        setDocumentAnalysis(prev => ({
+          ...prev,
+          [item.id]: {
+            ...(prev[item.id] || {}),
+            transcription: transcriptionResponse.data.transcription
+          }
+        }));
+        setTranscriptionShowCount(prev => ({ ...prev, [item.id]: TRANSCRIPTION_PAGE_SIZE }));
+      } catch (error) {
+        setDocumentAnalysis(prev => ({
+          ...prev,
+          [item.id]: {
+            ...(prev[item.id] || {}),
+            transcription: { status: 'failed', segments: [], lastUpdated: null, error: 'Failed to load transcription.' }
+          }
+        }));
+      } finally {
+        setLoadingTranscription(prev => ({ ...prev, [item.id]: false }));
       }
     }
   };
@@ -695,13 +754,19 @@ const KnowledgeBase: React.FC = () => {
     try {
       setAnalyzingDocument(recordingId);
       
-      const response = await apiClient.post(`/call-recordings/${recordingId}/analyze/summary`);
-      console.log('Analysis response:', response.data);
+      // Get summary analysis
+      const summaryResponse = await apiClient.post(`/call-recordings/${recordingId}/analyze/summary`);
+      console.log('Summary analysis response:', summaryResponse.data);
+
+      // Get transcription analysis
+      const transcriptionResponse = await apiClient.post(`/call-recordings/${recordingId}/analyze/transcription`);
+      console.log('Transcription analysis response:', transcriptionResponse.data);
 
       setDocumentAnalysis(prev => ({
         ...prev,
         [recordingId]: {
-          summary: response.data.summary
+          summary: summaryResponse.data.summary,
+          transcription: transcriptionResponse.data.transcription
         } as CallAnalysis
       }));
     } catch (error) {
@@ -911,11 +976,11 @@ const KnowledgeBase: React.FC = () => {
                 {/* Call Analysis Section */}
                 <div className="mt-6 w-full">
                   <h2 className="text-2xl font-bold text-gray-800 mb-6">Call Analysis</h2>
-                  {/* Key Points Section: always visible */}
+                  {/* Key Points Section */}
                   <details className="mb-4" open>
                     <summary className="cursor-pointer text-gray-700 font-semibold py-2">Key Points</summary>
                     <div className="space-y-4 p-2">
-                      {analyzingDocument === selectedItem.id ? (
+                      {loadingSummary[selectedItem.id] ? (
                         <div className="flex items-center space-x-2 text-blue-600">
                           <Loader2 className="animate-spin" size={20} />
                           <span>Analyzing call, please wait...</span>
@@ -937,7 +1002,7 @@ const KnowledgeBase: React.FC = () => {
                       )}
                     </div>
                   </details>
-                  {/* Collapsible sections for future analysis aspects: always visible, same logic */}
+                  {/* Sentiment Analysis Section */}
                   <details className="mb-4">
                     <summary className="cursor-pointer text-gray-700 font-semibold py-2">Sentiment Analysis (à venir)</summary>
                     <div className="p-4">
@@ -951,7 +1016,67 @@ const KnowledgeBase: React.FC = () => {
                       )}
                     </div>
                   </details>
-                  {/* Ajouter d'autres sections collapsibles ici, même logique */}
+
+                  {/* Transcription Section */}
+                  <details className="mb-4" open>
+                    <summary className="cursor-pointer text-gray-700 font-semibold py-2">Transcription</summary>
+                    <div className="p-4">
+                      {loadingTranscription[selectedItem.id] ? (
+                        <div className="flex items-center space-x-2 text-blue-600">
+                          <Loader2 className="animate-spin" size={20} />
+                          <span>Generating transcription, please wait...</span>
+                        </div>
+                      ) : (() => {
+                        if (!documentAnalysis || !selectedItem?.id) {
+                          return <div className="text-gray-500 italic">No transcription available yet.</div>;
+                        }
+                        const analysis = documentAnalysis[selectedItem.id];
+                        if (!analysis || !('transcription' in analysis)) {
+                          return <div className="text-gray-500 italic">No transcription available yet.</div>;
+                        }
+                        const callAnalysis = analysis as CallAnalysis;
+                        if (callAnalysis.transcription?.status !== 'completed' || !callAnalysis.transcription?.segments?.length) {
+                          return <div className="text-gray-500 italic">No transcription available yet.</div>;
+                        }
+                        const showCount = transcriptionShowCount[selectedItem.id] || TRANSCRIPTION_PAGE_SIZE;
+                        const segmentsToShow = callAnalysis.transcription.segments.slice(0, showCount);
+                        return (
+                          <div className="space-y-4">
+                            {segmentsToShow.map((segment: any, idx: number) => (
+                              <div key={idx} className="bg-gray-50 p-4 rounded-lg">
+                                <div className="flex justify-between items-center mb-2 text-sm text-gray-500">
+                                  <span>{typeof segment.start === 'string' ? segment.start : formatTime(segment.start)} - {typeof segment.end === 'string' ? segment.end : formatTime(segment.end)}</span>
+                                  {segment.speaker && <span className="font-medium">{segment.speaker}</span>}
+                                </div>
+                                <p className="text-gray-700">{segment.text}</p>
+                              </div>
+                            ))}
+                            {showCount < callAnalysis.transcription.segments.length && (
+                              <button
+                                className="mt-2 px-4 py-2 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                                onClick={() => setTranscriptionShowCount(prev => ({ ...prev, [selectedItem.id]: showCount + TRANSCRIPTION_PAGE_SIZE }))}
+                              >
+                                Show more
+                              </button>
+                            )}
+                            {showCount > TRANSCRIPTION_PAGE_SIZE && (
+                              <button
+                                className="mt-2 ml-2 px-4 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+                                onClick={() => setTranscriptionShowCount(prev => ({ ...prev, [selectedItem.id]: TRANSCRIPTION_PAGE_SIZE }))}
+                              >
+                                Show less
+                              </button>
+                            )}
+                            {callAnalysis.transcription.lastUpdated && (
+                              <div className="mt-4 text-sm text-gray-500">
+                                Last updated: {format(new Date(callAnalysis.transcription.lastUpdated), 'PPpp')}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </details>
                 </div>
               </div>
             )}
