@@ -461,79 +461,86 @@ const KnowledgeBase: React.FC = () => {
 
   // Refactor handleView to fetch summary, transcription, and scoring separately
   const handleView = async (item: any) => {
-    setSelectedItem(item);
-    setIsModalOpen(true);
-    // Fetch summary
-    if (!documentAnalysis[item.id] || !(documentAnalysis[item.id] as CallAnalysis).summary) {
-      setLoadingSummary(prev => ({ ...prev, [item.id]: true }));
-      try {
-        const summaryResponse = await apiClient.post(`/call-recordings/${item.id}/analyze/summary`);
-        setDocumentAnalysis(prev => ({
-          ...prev,
-          [item.id]: {
-            ...(prev[item.id] || {}),
-            summary: summaryResponse.data.summary
-          }
-        }));
-      } catch (error) {
-        setDocumentAnalysis(prev => ({
-          ...prev,
-          [item.id]: {
-            ...(prev[item.id] || {}),
-            summary: { keyIdeas: [], lastUpdated: null, error: 'Failed to load summary.' }
-          }
-        }));
-      } finally {
-        setLoadingSummary(prev => ({ ...prev, [item.id]: false }));
+    if (activeTab === 'documents') {
+      setSelectedDocumentForAnalysis(item);
+      setShowAnalysisPage(true);
+      await analyzeDocument(item.id);
+    } else {
+      // Pour les call recordings, on peut ouvrir la modale de détails
+      setSelectedItem(item);
+      setIsModalOpen(true);
+      // Fetch summary
+      if (!documentAnalysis[item.id] || !(documentAnalysis[item.id] as CallAnalysis).summary) {
+        setLoadingSummary(prev => ({ ...prev, [item.id]: true }));
+        try {
+          const summaryResponse = await apiClient.post(`/call-recordings/${item.id}/analyze/summary`);
+          setDocumentAnalysis(prev => ({
+            ...prev,
+            [item.id]: {
+              ...(prev[item.id] || {}),
+              summary: summaryResponse.data.summary
+            }
+          }));
+        } catch (error) {
+          setDocumentAnalysis(prev => ({
+            ...prev,
+            [item.id]: {
+              ...(prev[item.id] || {}),
+              summary: { keyIdeas: [], lastUpdated: null, error: 'Failed to load summary.' }
+            }
+          }));
+        } finally {
+          setLoadingSummary(prev => ({ ...prev, [item.id]: false }));
+        }
       }
-    }
-    // Fetch transcription
-    if (!documentAnalysis[item.id] || !(documentAnalysis[item.id] as CallAnalysis).transcription) {
-      setLoadingTranscription(prev => ({ ...prev, [item.id]: true }));
-      try {
-        const transcriptionResponse = await apiClient.post(`/call-recordings/${item.id}/analyze/transcription`);
-        setDocumentAnalysis(prev => ({
-          ...prev,
-          [item.id]: {
-            ...(prev[item.id] || {}),
-            transcription: transcriptionResponse.data.transcription
-          }
-        }));
-        setTranscriptionShowCount(prev => ({ ...prev, [item.id]: TRANSCRIPTION_PAGE_SIZE }));
-      } catch (error) {
-        setDocumentAnalysis(prev => ({
-          ...prev,
-          [item.id]: {
-            ...(prev[item.id] || {}),
-            transcription: { status: 'failed', segments: [], lastUpdated: null, error: 'Failed to load transcription.' }
-          }
-        }));
-      } finally {
-        setLoadingTranscription(prev => ({ ...prev, [item.id]: false }));
+      // Fetch transcription
+      if (!documentAnalysis[item.id] || !(documentAnalysis[item.id] as CallAnalysis).transcription) {
+        setLoadingTranscription(prev => ({ ...prev, [item.id]: true }));
+        try {
+          const transcriptionResponse = await apiClient.post(`/call-recordings/${item.id}/analyze/transcription`);
+          setDocumentAnalysis(prev => ({
+            ...prev,
+            [item.id]: {
+              ...(prev[item.id] || {}),
+              transcription: transcriptionResponse.data.transcription
+            }
+          }));
+          setTranscriptionShowCount(prev => ({ ...prev, [item.id]: TRANSCRIPTION_PAGE_SIZE }));
+        } catch (error) {
+          setDocumentAnalysis(prev => ({
+            ...prev,
+            [item.id]: {
+              ...(prev[item.id] || {}),
+              transcription: { status: 'failed', segments: [], lastUpdated: null, error: 'Failed to load transcription.' }
+            }
+          }));
+        } finally {
+          setLoadingTranscription(prev => ({ ...prev, [item.id]: false }));
+        }
       }
-    }
-    // Fetch scoring
-    if (!documentAnalysis[item.id] || !(documentAnalysis[item.id] as any).scoring) {
-      setLoadingScoring(prev => ({ ...prev, [item.id]: true }));
-      try {
-        const scoringResponse = await apiClient.post(`/call-recordings/${item.id}/analyze/scoring`);
-        setDocumentAnalysis(prev => ({
-          ...prev,
-          [item.id]: {
-            ...(prev[item.id] || {}),
-            scoring: scoringResponse.data.scoring
-          }
-        }));
-      } catch (error) {
-        setDocumentAnalysis(prev => ({
-          ...prev,
-          [item.id]: {
-            ...(prev[item.id] || {}),
-            scoring: { status: 'failed', result: null, lastUpdated: null, error: 'Failed to load scoring.' }
-          }
-        }));
-      } finally {
-        setLoadingScoring(prev => ({ ...prev, [item.id]: false }));
+      // Fetch scoring
+      if (!documentAnalysis[item.id] || !(documentAnalysis[item.id] as any).scoring) {
+        setLoadingScoring(prev => ({ ...prev, [item.id]: true }));
+        try {
+          const scoringResponse = await apiClient.post(`/call-recordings/${item.id}/analyze/scoring`);
+          setDocumentAnalysis(prev => ({
+            ...prev,
+            [item.id]: {
+              ...(prev[item.id] || {}),
+              scoring: scoringResponse.data.scoring
+            }
+          }));
+        } catch (error) {
+          setDocumentAnalysis(prev => ({
+            ...prev,
+            [item.id]: {
+              ...(prev[item.id] || {}),
+              scoring: { status: 'failed', result: null, lastUpdated: null, error: 'Failed to load scoring.' }
+            }
+          }));
+        } finally {
+          setLoadingScoring(prev => ({ ...prev, [item.id]: false }));
+        }
       }
     }
   };
