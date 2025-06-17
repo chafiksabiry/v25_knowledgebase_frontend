@@ -90,6 +90,7 @@ const KnowledgeBase: React.FC = () => {
   const [loadingSummary, setLoadingSummary] = useState<{[key: string]: boolean}>({});
   const [loadingTranscription, setLoadingTranscription] = useState<{[key: string]: boolean}>({});
   const [transcriptionShowCount, setTranscriptionShowCount] = useState<{[key: string]: number}>({});
+  const [loadingScoring, setLoadingScoring] = useState<{[key: string]: boolean}>({});
   const TRANSCRIPTION_PAGE_SIZE = 5;
   
   // Load items from localStorage on mount
@@ -458,7 +459,7 @@ const KnowledgeBase: React.FC = () => {
     }
   };
 
-  // Refactor handleView to fetch summary and transcription separately
+  // Refactor handleView to fetch summary, transcription, and scoring separately
   const handleView = async (item: any) => {
     setSelectedItem(item);
     setIsModalOpen(true);
@@ -509,6 +510,30 @@ const KnowledgeBase: React.FC = () => {
         }));
       } finally {
         setLoadingTranscription(prev => ({ ...prev, [item.id]: false }));
+      }
+    }
+    // Fetch scoring
+    if (!documentAnalysis[item.id] || !(documentAnalysis[item.id] as any).scoring) {
+      setLoadingScoring(prev => ({ ...prev, [item.id]: true }));
+      try {
+        const scoringResponse = await apiClient.post(`/call-recordings/${item.id}/analyze/scoring`);
+        setDocumentAnalysis(prev => ({
+          ...prev,
+          [item.id]: {
+            ...(prev[item.id] || {}),
+            scoring: scoringResponse.data.scoring
+          }
+        }));
+      } catch (error) {
+        setDocumentAnalysis(prev => ({
+          ...prev,
+          [item.id]: {
+            ...(prev[item.id] || {}),
+            scoring: { status: 'failed', result: null, lastUpdated: null, error: 'Failed to load scoring.' }
+          }
+        }));
+      } finally {
+        setLoadingScoring(prev => ({ ...prev, [item.id]: false }));
       }
     }
   };
@@ -1002,21 +1027,6 @@ const KnowledgeBase: React.FC = () => {
                       )}
                     </div>
                   </details>
-                  {/* Sentiment Analysis Section */}
-                  <details className="mb-4">
-                    <summary className="cursor-pointer text-gray-700 font-semibold py-2">Sentiment Analysis (à venir)</summary>
-                    <div className="p-4">
-                      {analyzingDocument === selectedItem.id ? (
-                        <div className="flex items-center space-x-2 text-blue-600">
-                          <Loader2 className="animate-spin" size={20} />
-                          <span>Analyzing call, please wait...</span>
-                        </div>
-                      ) : (
-                        <div className="text-gray-500 italic">No analysis available yet.</div>
-                      )}
-                    </div>
-                  </details>
-
                   {/* Transcription Section */}
                   <details className="mb-4" open>
                     <summary className="cursor-pointer text-gray-700 font-semibold py-2">Transcription</summary>
@@ -1070,6 +1080,48 @@ const KnowledgeBase: React.FC = () => {
                             {callAnalysis.transcription.lastUpdated && (
                               <div className="mt-4 text-sm text-gray-500">
                                 Last updated: {format(new Date(callAnalysis.transcription.lastUpdated), 'PPpp')}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </details>
+                  {/* Scoring Section */}
+                  <details className="mb-4" open>
+                    <summary className="cursor-pointer text-gray-700 font-semibold py-2">Scoring</summary>
+                    <div className="p-4">
+                      {loadingScoring[selectedItem.id] ? (
+                        <div className="flex items-center space-x-2 text-blue-600">
+                          <Loader2 className="animate-spin" size={20} />
+                          <span>Generating scoring, please wait...</span>
+                        </div>
+                      ) : (() => {
+                        if (!documentAnalysis || !selectedItem?.id) {
+                          return <div className="text-gray-500 italic">No scoring available yet.</div>;
+                        }
+                        const analysis = documentAnalysis[selectedItem.id];
+                        if (!analysis || !('scoring' in analysis)) {
+                          return <div className="text-gray-500 italic">No scoring available yet.</div>;
+                        }
+                        const scoring = (analysis as any).scoring;
+                        if (scoring?.status !== 'completed' || !scoring?.result) {
+                          return <div className="text-gray-500 italic">No scoring available yet.</div>;
+                        }
+                        return (
+                          <div className="space-y-4">
+                            {Object.entries(scoring.result).map(([section, value]: [string, any]) => (
+                              <div key={section} className="bg-gray-50 p-4 rounded-lg">
+                                <div className="flex justify-between items-center mb-2 text-sm text-gray-500">
+                                  <span className="font-medium">{section}</span>
+                                  <span>Score: {value.score}</span>
+                                </div>
+                                <p className="text-gray-700">{value.feedback}</p>
+                              </div>
+                            ))}
+                            {scoring.lastUpdated && (
+                              <div className="mt-4 text-sm text-gray-500">
+                                Last updated: {format(new Date(scoring.lastUpdated), 'PPpp')}
                               </div>
                             )}
                           </div>
