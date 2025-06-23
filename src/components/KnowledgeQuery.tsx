@@ -135,13 +135,10 @@ const KnowledgeQuery: React.FC = () => {
         <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
           <div className="p-6">
             <h3 className="text-lg font-semibold mb-4">Answer</h3>
-            <div className="prose max-w-none text-gray-700">
-              {response.data?.answer.split('\n').map((paragraph, index) => (
-                <p key={index} className="mb-4 last:mb-0">
-                  {paragraph}
-                </p>
-              ))}
-            </div>
+            <div 
+              className="prose max-w-none text-gray-700"
+              dangerouslySetInnerHTML={{ __html: response.data?.answer || '' }}
+            />
           </div>
           {response.data?.metadata && (
             <div className="border-t border-gray-200 bg-gray-50 p-4 rounded-b-lg">
