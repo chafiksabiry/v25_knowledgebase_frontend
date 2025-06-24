@@ -31,6 +31,7 @@ const Sidebar: React.FC<SidebarProps> = ({ progress }) => {
     { path: '/upload', icon: <FileText size={20} />, label: 'Knowledge Base', roles: ['admin', 'manager', 'rep'] },
     { path: '/knowledge-insights', icon: <Brain size={20} />, label: 'KB Insights', roles: ['admin', 'manager'] },
     { path: '/knowledge-query', icon: <MessageSquare size={20} />, label: 'Ask KB', roles: ['admin', 'manager', 'rep'] },
+    { path: '/script-generator', icon: <FileText size={20} />, label: 'Script Generator', roles: ['admin', 'manager', 'rep'] }, 
     { path: '/assistant', icon: <MessageSquare size={20} />, label: 'AI Assistant', roles: ['admin', 'manager', 'rep'] },
     { path: '/insights', icon: <Brain size={20} />, label: 'Contact Insights', roles: ['admin', 'manager', 'rep'] },
     { path: '/augmented-learning', icon: <Zap size={20} />, label: 'AI Learning', roles: ['admin'] },

@@ -66,7 +66,6 @@ const KnowledgeBase: React.FC = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [isFirstUpload, setIsFirstUpload] = useState(true);
   const [contactId, setContactId] = useState('');
-  const [callDuration, setCallDuration] = useState('');
   const [sentiment, setSentiment] = useState<'positive' | 'negative' | 'neutral'>('neutral');
   const [aiInsights, setAiInsights] = useState<string[]>([]);
   const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
@@ -91,6 +90,7 @@ const KnowledgeBase: React.FC = () => {
   const [loadingTranscription, setLoadingTranscription] = useState<{[key: string]: boolean}>({});
   const [transcriptionShowCount, setTranscriptionShowCount] = useState<{[key: string]: number}>({});
   const [loadingScoring, setLoadingScoring] = useState<{[key: string]: boolean}>({});
+  const [callDurations, setCallDurations] = useState<{ [id: string]: number }>({});
   const TRANSCRIPTION_PAGE_SIZE = 5;
   
   // Load items from localStorage on mount
@@ -748,10 +748,19 @@ const KnowledgeBase: React.FC = () => {
     if (isNaN(time) || time < 0) {
       return '0:00';
     }
-    
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  // Nouvelle fonction pour formater la date (jour, mois, année)
+  const formatDate = (dateString: string) => {
+    if (!dateString) return '';
+    try {
+      return format(new Date(dateString), 'dd MMM yyyy');
+    } catch {
+      return dateString;
+    }
   };
 
   // Stop audio playback when switching tabs
@@ -815,6 +824,15 @@ const KnowledgeBase: React.FC = () => {
   // Add type guard for tab comparison
   const isDocumentsTab = (tab: TabType): tab is 'documents' => tab === 'documents';
   const isCallsTab = (tab: TabType): tab is 'calls' => tab === 'calls';
+
+  // Fonction utilitaire pour charger la durée d'un audio à partir de son URL
+  const fetchAudioDuration = (recordingUrl: string, callId: string) => {
+    if (!recordingUrl || callDurations[callId]) return;
+    const audio = new Audio(recordingUrl);
+    audio.addEventListener('loadedmetadata', () => {
+      setCallDurations(prev => ({ ...prev, [callId]: audio.duration }));
+    });
+  };
 
   const renderContent = () => {
     if (isDocumentsTab(activeTab)) {
@@ -902,60 +920,65 @@ const KnowledgeBase: React.FC = () => {
       <div className="space-y-4">
         {callRecords.length > 0 ? (
           <>
-            {callRecords.map((call) => (
-              <div key={call.id} className="bg-white p-5 rounded-lg shadow-sm border border-gray-100">
-                <div className="flex items-start">
-                  <div className="p-3 rounded-lg bg-purple-100 mr-4 flex-shrink-0">
-                    <Mic size={20} className="text-purple-500" />
-                  </div>
-                  <div className="flex-grow min-w-0">
-                    <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
-                      <h3 className="text-lg font-medium text-gray-900 truncate">{call.contactId}</h3>
-                      <div className="flex items-center space-x-2 flex-shrink-0">
-                        {call.processingOptions?.sentiment && call.sentiment && (
-                          <span className={`px-2 py-1 text-xs rounded-full whitespace-nowrap ${
-                            call.sentiment === 'positive' ? 'bg-green-100 text-green-800' : 
-                            call.sentiment === 'negative' ? 'bg-red-100 text-red-800' : 
-                            'bg-gray-100 text-gray-800'
-                          }`}>
-                            {call.sentiment.charAt(0).toUpperCase() + call.sentiment.slice(1)} Sentiment
-                          </span>
-                        )}
-                        <button 
-                          onClick={() => handleView(call)}
-                          className="text-blue-600 hover:text-blue-800 p-1"
-                          title="View details"
-                        >
-                          <Eye size={16} />
-                        </button>
-                        <button 
-                          className="text-red-600 hover:text-red-800 p-1"
-                          onClick={() => handleDelete(call.id)}
-                          title="Delete call recording"
-                        >
-                          <Trash2 size={16} />
-                        </button>
+            {callRecords.map((call) => {
+              // Charger la durée si pas déjà chargée
+              fetchAudioDuration(call.recordingUrl, call.id);
+              return (
+                <div key={call.id} className="bg-white p-5 rounded-lg shadow-sm border border-gray-100">
+                  <div className="flex items-start">
+                    <div className="p-3 rounded-lg bg-purple-100 mr-4 flex-shrink-0">
+                      <Mic size={20} className="text-purple-500" />
+                    </div>
+                    <div className="flex-grow min-w-0">
+                      <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                        <h3 className="text-lg font-medium text-gray-900 truncate">{call.contactId}</h3>
+                        <div className="flex items-center space-x-2 flex-shrink-0">
+                          {call.processingOptions?.sentiment && call.sentiment && (
+                            <span className={`px-2 py-1 text-xs rounded-full whitespace-nowrap ${
+                              call.sentiment === 'positive' ? 'bg-green-100 text-green-800' : 
+                              call.sentiment === 'negative' ? 'bg-red-100 text-red-800' : 
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {call.sentiment.charAt(0).toUpperCase() + call.sentiment.slice(1)} Sentiment
+                            </span>
+                          )}
+                          <button 
+                            onClick={() => handleView(call)}
+                            className="text-blue-600 hover:text-blue-800 p-1"
+                            title="View details"
+                          >
+                            <Eye size={16} />
+                          </button>
+                          <button 
+                            className="text-red-600 hover:text-red-800 p-1"
+                            onClick={() => handleDelete(call.id)}
+                            title="Delete call recording"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex items-center text-sm text-gray-500 mb-3 whitespace-nowrap">
-                      <Clock size={14} className="mr-1 flex-shrink-0" />
-                      {call.date} • {call.duration} minutes
-                    </div>
-                    <p className="text-sm text-gray-700 mb-3 break-words overflow-hidden">{call.summary}</p>
-                    <div className="flex flex-wrap gap-1 mb-3">
-                      {call.tags.map((tag: string, index: number) => (
-                        <span 
-                          key={`${call.id}-${tag}`}
-                          className="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-700 whitespace-nowrap"
-                        >
-                          {tag}
-                        </span>
-                      ))}
+                      <div className="flex items-center text-sm text-gray-500 mb-3 whitespace-nowrap">
+                        <Clock size={14} className="mr-1 flex-shrink-0" />
+                        {/* Date formatée et durée dynamique mm:ss */}
+                        {formatDate(call.date)} • {callDurations[call.id] !== undefined ? formatTime(callDurations[call.id]) : '...'}
+                      </div>
+                      <p className="text-sm text-gray-700 mb-3 break-words overflow-hidden">{call.summary}</p>
+                      <div className="flex flex-wrap gap-1 mb-3">
+                        {call.tags.map((tag: string, index: number) => (
+                          <span 
+                            key={`${call.id}-${tag}`}
+                            className="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-700 whitespace-nowrap"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
             {/* Panneau de détails sous la liste */}
             {selectedItem && (
               <div className="bg-white rounded-lg shadow-lg border border-blue-200 mt-6 p-6 w-full">
@@ -978,7 +1001,7 @@ const KnowledgeBase: React.FC = () => {
                       <p className="text-gray-600 mb-2">{selectedItem.summary}</p>
                       <div className="flex items-center text-gray-500 mb-2">
                         <Clock size={16} className="mr-2" />
-                        {format(new Date(selectedItem.date), 'MMM d, yyyy')} • {selectedItem.duration} minutes
+                        {formatDate(selectedItem.date)} • {callDurations[selectedItem.id] !== undefined ? formatTime(callDurations[selectedItem.id]) : '...'}
                       </div>
                       {selectedItem.tags && selectedItem.tags.length > 0 && (
                         <div className="flex flex-wrap gap-2 mb-2">
