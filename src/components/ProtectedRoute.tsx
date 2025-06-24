@@ -8,7 +8,7 @@ interface ProtectedRouteProps {
   requiresOnboarding?: boolean;
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ element, requiresOnboarding = true }) => {
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ element }) => {
   const isInAppMode = import.meta.env.VITE_RUN_MODE === 'in-app';
   
   // If not in in-app mode, return the element without restrictions
@@ -32,24 +32,15 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ element, requiresOnboar
     return <Navigate to="/upload" replace />;
   }
 
-  // Find phase 1 and check if step 3 is completed
-  const phase1 = progress.phases.find(phase => phase.id === 1);
-  const step3 = phase1?.steps.find(step => step.id === 3);
-  const isPhase1Step3Completed = step3?.status === 'completed';
+  // Vérifier si l'étape 7 est complétée
+  const isStep7Completed = progress.completedSteps?.includes(7);
 
-  // Allow access to upload page if in phase 2 and step 3 is not completed
-  if (progress.currentPhase === 2 && 
-      !isPhase1Step3Completed && 
-      window.location.pathname !== '/upload') {
-    return <Navigate to="/upload" replace />;
-  }
-
-  // Allow access to other sections if phase > 2 and step 3 of phase 1 is completed
-  if (progress.currentPhase > 2 && isPhase1Step3Completed) {
+  // Si l'étape 7 est complétée, accès complet
+  if (isStep7Completed) {
     return element;
   }
 
-  // Default: only allow access to upload page
+  // Sinon, rediriger vers upload (sauf si déjà sur upload)
   if (window.location.pathname === '/upload') {
     return element;
   }
