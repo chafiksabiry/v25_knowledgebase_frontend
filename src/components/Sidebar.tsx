@@ -19,8 +19,8 @@ const Sidebar: React.FC<SidebarProps> = ({ progress }) => {
   // Check if step 7 is completed using completedSteps array
   const isStep7Completed = progress?.completedSteps?.includes(7);
 
-  // Condition simplifiée : basée uniquement sur l'étape 7 comme point de basculement
-  const canAccessOtherSections = !isInAppMode || isStep7Completed;
+  // Condition plus claire : basée uniquement sur l'étape 7 comme point de basculement
+  const canAccessOtherSections = !isInAppMode || (isInAppMode && isStep7Completed);
   
   // Define navigation items based on user role and progress
   const navItems = [
