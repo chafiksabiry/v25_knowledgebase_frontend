@@ -17,6 +17,7 @@ import UserManagement from './components/UserManagement';
 import PermissionsManagement from './components/PermissionsManagement';
 import ProtectedRoute from './components/ProtectedRoute';
 import { OnboardingProgress } from './types/onboarding';
+import ScriptGenerator from './components/ScriptGenerator';
 
 // ⬇️ Ajoute le qiankun helper
 import { qiankunWindow } from 'vite-plugin-qiankun/dist/helper';
@@ -88,6 +89,7 @@ function App() {
                   </div>
                 } />
               } />
+              <Route path="/script-generator" element={<ProtectedRoute element={<ScriptGenerator />} />} />
             </Routes>
           </main>
         </div>
