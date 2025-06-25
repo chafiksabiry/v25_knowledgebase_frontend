@@ -136,19 +136,13 @@ interface Gig {
 }
 
 const ScriptGenerator: React.FC = () => {
-  const [projectId, setProjectId] = useState('');
-  const [scriptType, setScriptType] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [response, setResponse] = useState<ScriptResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [objectif, setObjectif] = useState('');
   const [domaine, setDomaine] = useState('');
   const [typeClient, setTypeClient] = useState('');
-  const [methode, setMethode] = useState('');
   const [contexte, setContexte] = useState('');
   const [langueTon, setLangueTon] = useState('');
-  
-  // New state for gigs functionality
   const [gigs, setGigs] = useState<Gig[]>([]);
   const [selectedGig, setSelectedGig] = useState<Gig | null>(null);
   const [isLoadingGigs, setIsLoadingGigs] = useState(false);
@@ -216,7 +210,6 @@ const ScriptGenerator: React.FC = () => {
   const handleGigSelection = (gig: Gig) => {
     setSelectedGig(gig);
     setDomaine(gig.category || '');
-    // You can also auto-populate other fields based on gig data if needed
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -227,30 +220,14 @@ const ScriptGenerator: React.FC = () => {
     try {
       const companyId = getCompanyId();
       if (!companyId) throw new Error('Company ID not found');
-      
+      if (!selectedGig) throw new Error('Vous devez sélectionner un gig pour générer un script.');
       const requestData: any = {
         companyId,
-        domaine,
+        gig: selectedGig,
         typeClient,
-        langueTon
+        langueTon,
+        contexte
       };
-
-      // Add gig information if a gig is selected
-      if (selectedGig) {
-        requestData.gigId = selectedGig._id;
-        requestData.gigTitle = selectedGig.title;
-        requestData.gigDescription = selectedGig.description;
-        requestData.gigCategory = selectedGig.category;
-      }
-
-      // Keep objectif and contexte as they might still be useful
-      if (objectif.trim()) {
-        requestData.objectif = objectif;
-      }
-      if (contexte.trim()) {
-        requestData.contexte = contexte;
-      }
-
       const apiResponse = await apiClient.post<ScriptResponse>('/rag/generate-script', requestData);
       setResponse(apiResponse.data);
     } catch (err: any) {
@@ -334,75 +311,70 @@ const ScriptGenerator: React.FC = () => {
         )}
       </div>
 
-      <form onSubmit={handleSubmit} className="mb-8 space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Domaine</label>
-          <input
-            type="text"
-            value={domaine}
-            onChange={e => setDomaine(e.target.value)}
-            placeholder="e.g. Assurance, Prévoyance, Santé..."
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            required
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Objectif de l'appel (optionnel)</label>
-          <input
-            type="text"
-            value={objectif}
-            onChange={e => setObjectif(e.target.value)}
-            placeholder="e.g. Vente, Support, Conseil..."
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Type de client (DISC)</label>
-          <select
-            value={typeClient}
-            onChange={e => setTypeClient(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            required
+      {/* Formulaire de génération de script */}
+      {gigs.length > 0 && (
+        <form onSubmit={handleSubmit} className="mb-8 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Domaine</label>
+            <input
+              type="text"
+              value={domaine}
+              readOnly
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-700 cursor-not-allowed focus:ring-0 focus:border-gray-300"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Type de client (DISC) <span className="text-red-500">*</span></label>
+            <select
+              value={typeClient}
+              onChange={e => setTypeClient(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              required
+            >
+              <option value="">Sélectionner un profil DISC</option>
+              <option value="D">D : Direct et axé sur les résultats</option>
+              <option value="I">I : Enthousiaste et relationnel</option>
+              <option value="S">S : Rassurant et stable</option>
+              <option value="C">C : Structuré et analytique</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Contexte spécifique (optionnel mais recommandé)</label>
+            <input
+              type="text"
+              value={contexte}
+              onChange={e => setContexte(e.target.value)}
+              placeholder="e.g. Historique client, émotion, objections..."
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Langue & ton souhaité <span className="text-red-500">*</span></label>
+            <input
+              type="text"
+              value={langueTon}
+              onChange={e => setLangueTon(e.target.value)}
+              placeholder="e.g. Formel, chaleureux, professionnel..."
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              required
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={
+              isLoading ||
+              !selectedGig ||
+              !domaine.trim() ||
+              !typeClient.trim() ||
+              !langueTon.trim()
+            }
+            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
-            <option value="">Sélectionner un profil DISC</option>
-            <option value="D">D : Direct et axé sur les résultats</option>
-            <option value="I">I : Enthousiaste et relationnel</option>
-            <option value="S">S : Rassurant et stable</option>
-            <option value="C">C : Structuré et analytique</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Contexte spécifique (optionnel)</label>
-          <input
-            type="text"
-            value={contexte}
-            onChange={e => setContexte(e.target.value)}
-            placeholder="e.g. Historique client, émotion, objections..."
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Langue & ton souhaité</label>
-          <input
-            type="text"
-            value={langueTon}
-            onChange={e => setLangueTon(e.target.value)}
-            placeholder="e.g. Formel, chaleureux, professionnel..."
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-        </div>
-        <button
-          type="submit"
-          disabled={
-            isLoading ||
-            !domaine.trim() ||
-            !typeClient.trim()
-          }
-          className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-        >
-          {isLoading ? 'Generating...' : 'Generate Script'}
-        </button>
-      </form>
+            {isLoading ? 'Génération en cours...' : 'Générer le script'}
+          </button>
+        </form>
+      )}
       {error && (
         <div className="p-4 mb-6 bg-red-50 border border-red-200 rounded-lg">
           <p className="text-red-800 font-medium">An error occurred</p>
