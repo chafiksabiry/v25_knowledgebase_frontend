@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import apiClient from '../api/client';
 import Cookies from 'js-cookie';
-import { User, Headphones } from 'lucide-react';
+import { User, Headphones, Plus, ArrowLeft, Eye, Calendar, Target, Globe } from 'lucide-react';
 
 interface ScriptResponse {
   success: boolean;
@@ -364,218 +364,424 @@ const ScriptGenerator: React.FC = () => {
   };
 
   return (
-    <div className="max-w-5xl mx-auto p-6">
-      <div className="mb-8 flex items-center justify-between">
-        <h2 className="text-2xl font-bold mb-2">Generated Scripts</h2>
-        {view !== 'form' && (
-          <button
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow transition"
-            onClick={handleShowFormClick}
-          >
-            Generate a new script
-          </button>
-        )}
-        {view === 'form' && (
-          <button
-            className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 shadow transition"
-            onClick={handleBackToTable}
-          >
-            Back
-          </button>
-        )}
-        {view === 'script' && (
-          <button
-            className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 shadow transition"
-            onClick={handleBackToTable}
-          >
-            Back
-          </button>
-        )}
-      </div>
-      {/* Table view */}
-      {view === 'table' && (
-        <div className="overflow-x-auto mb-10">
-          {isLoadingScripts ? (
-            <div className="text-gray-600">Loading scripts...</div>
-          ) : scriptsError ? (
-            <div className="p-2 bg-red-50 border border-red-200 rounded-lg text-red-700">{scriptsError}</div>
-          ) : scripts.length === 0 ? (
-            <div className="text-gray-500 italic">No scripts generated for this company.</div>
-          ) : (
-            <table className="min-w-full border rounded-lg overflow-hidden shadow-sm">
-              <thead className="bg-blue-50">
-                <tr>
-                  <th className="px-4 py-2 border-b text-left">Gig</th>
-                  <th className="px-4 py-2 border-b text-left">Target Client</th>
-                  <th className="px-4 py-2 border-b text-left">Language</th>
-                  <th className="px-4 py-2 border-b text-left">Date</th>
-                  <th className="px-4 py-2 border-b text-center">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {scripts.map((script, idx) => {
-                  const gig = script.gig || gigs.find(g => g._id === script.gigId);
-                  return (
-                    <tr
-                      key={script._id}
-                      className={
-                        (idx % 2 === 0 ? 'bg-white' : 'bg-gray-50')
-                      }
-                    >
-                      <td className="px-4 py-2 border-b font-semibold">{gig?.title || gig?.category || script.gigId}</td>
-                      <td className="px-4 py-2 border-b">{script.targetClient}</td>
-                      <td className="px-4 py-2 border-b">{script.language}</td>
-                      <td className="px-4 py-2 border-b">{new Date(script.createdAt).toLocaleString()}</td>
-                      <td className="px-4 py-2 border-b text-center">
-                        <button
-                          className="text-blue-600 underline hover:text-blue-800 font-medium transition"
-                          onClick={() => handleShowScript(script)}
-                        >
-                          Show
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+      <div className="max-w-6xl mx-auto p-6">
+        {/* Header */}
+        <div className="mb-8 flex items-center justify-between bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
+          <div className="flex items-center gap-4">
+            {isInAppMode() && (
+              <button
+                onClick={handleBackToOrchestrator}
+                className="p-3 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200 group"
+                title="Back to Orchestrator"
+              >
+                <ArrowLeft className="w-6 h-6 group-hover:scale-110 transition-transform" />
+              </button>
+            )}
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl">
+                <Headphones className="w-8 h-8 text-white" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                  Script Generator
+                </h1>
+                <p className="text-gray-500 text-sm">Create personalized call scripts for your gigs</p>
+              </div>
+            </div>
+          </div>
+          {view !== 'form' && (
+            <button
+              className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2 font-medium"
+              onClick={handleShowFormClick}
+            >
+              <Plus className="w-5 h-5" />
+              Generate New Script
+            </button>
+          )}
+          {(view === 'form' || view === 'script') && (
+            <button
+              className="px-6 py-3 bg-white text-gray-700 border-2 border-gray-200 rounded-xl hover:bg-gray-50 hover:border-gray-300 shadow-md hover:shadow-lg transition-all duration-200 flex items-center gap-2 font-medium"
+              onClick={handleBackToTable}
+            >
+              <ArrowLeft className="w-5 h-5" />
+              Back to Scripts
+            </button>
           )}
         </div>
-      )}
-      {/* Script detail view */}
-      {view === 'script' && selectedScript && (
-        <div className="mb-10 p-6 bg-white border rounded-xl shadow-lg animate-fade-in">
-          <h3 className="text-xl font-bold mb-4 text-blue-700 flex items-center gap-2">
-            <Headphones className="w-6 h-6 text-blue-500" /> Call Script
-          </h3>
-          <div className="mb-2 text-gray-600 text-sm flex flex-wrap gap-4">
-            <span><b>Gig:</b> {selectedScript.gig?.title || selectedScript.gig?.category || selectedScript.gigId}</span>
-            <span><b>Target Client:</b> {selectedScript.targetClient}</span>
-            <span><b>Language:</b> {selectedScript.language}</span>
-            {selectedScript.details && <span><b>Context:</b> {selectedScript.details}</span>}
-            <span><b>Date:</b> {new Date(selectedScript.createdAt).toLocaleString()}</span>
-          </div>
-          <div className="flex flex-col gap-4 mt-6">
-            {Array.isArray(selectedScript.script) && selectedScript.script.length > 0 ? (
-              selectedScript.script.map((step, idx) => (
-                <div key={idx} className="flex items-start gap-3">
-                  <div className="flex-shrink-0 mt-1">
-                    {step.actor === 'agent' ? (
-                      <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100">
-                        <Headphones className="w-5 h-5 text-blue-600" />
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-green-100">
-                        <User className="w-5 h-5 text-green-600" />
-                      </span>
-                    )}
+
+        {/* Table view */}
+        {view === 'table' && (
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+            <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-blue-50">
+              <h3 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
+                <Target className="w-6 h-6 text-blue-600" />
+                Your Generated Scripts
+              </h3>
+              <p className="text-gray-600 text-sm mt-1">Manage and view all your call scripts</p>
+            </div>
+            
+            {isLoadingScripts ? (
+              <div className="p-12 text-center">
+                <div className="inline-flex items-center gap-3 text-gray-600">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                  Loading your scripts...
+                </div>
+              </div>
+            ) : scriptsError ? (
+              <div className="p-8 m-6 bg-red-50 border border-red-200 rounded-xl">
+                <div className="flex items-center gap-3 text-red-700">
+                  <div className="p-2 bg-red-100 rounded-lg">
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
                   </div>
-                  <div className="flex-1">
-                    <div className="text-xs text-gray-500 mb-1 font-semibold uppercase tracking-wide">
-                      {step.phase}
+                  <div>
+                    <p className="font-medium">Error loading scripts</p>
+                    <p className="text-sm">{scriptsError}</p>
+                  </div>
+                </div>
+              </div>
+            ) : scripts.length === 0 ? (
+              <div className="p-12 text-center">
+                <div className="p-4 bg-gray-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                  <Headphones className="w-8 h-8 text-gray-400" />
+                </div>
+                <h4 className="text-lg font-medium text-gray-700 mb-2">No scripts yet</h4>
+                <p className="text-gray-500 mb-6">Create your first call script to get started</p>
+                <button
+                  className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2 font-medium mx-auto"
+                  onClick={handleShowFormClick}
+                >
+                  <Plus className="w-5 h-5" />
+                  Generate Your First Script
+                </button>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full">
+                  <thead className="bg-gradient-to-r from-gray-50 to-blue-50">
+                    <tr>
+                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Gig</th>
+                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Target Client</th>
+                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Language</th>
+                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Created</th>
+                      <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {scripts.map((script, idx) => {
+                      const gig = script.gig || gigs.find(g => g._id === script.gigId);
+                      return (
+                        <tr
+                          key={script._id}
+                          className="hover:bg-blue-50 transition-colors duration-150 group"
+                        >
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 bg-blue-100 rounded-lg group-hover:bg-blue-200 transition-colors">
+                                <Target className="w-4 h-4 text-blue-600" />
+                              </div>
+                              <div>
+                                <p className="font-semibold text-gray-800">{gig?.title || 'Untitled Gig'}</p>
+                                <p className="text-sm text-gray-500">{gig?.category || script.gigId}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800">
+                              {script.targetClient}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-2">
+                              <Globe className="w-4 h-4 text-gray-400" />
+                              <span className="text-gray-700">{script.language}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-2 text-gray-600">
+                              <Calendar className="w-4 h-4" />
+                              <span className="text-sm">{new Date(script.createdAt).toLocaleDateString()}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <button
+                              className="inline-flex items-center gap-2 px-4 py-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-all duration-200 font-medium"
+                              onClick={() => handleShowScript(script)}
+                            >
+                              <Eye className="w-4 h-4" />
+                              View Script
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Script detail view */}
+        {view === 'script' && selectedScript && (
+          <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden animate-fadeIn">
+            <div className="p-6 bg-gradient-to-r from-blue-600 to-purple-600 text-white">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-white/20 rounded-xl">
+                  <Headphones className="w-8 h-8" />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold">Call Script</h3>
+                  <p className="text-blue-100">Ready to use conversation guide</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="p-6 border-b border-gray-100 bg-gray-50">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="flex items-center gap-2">
+                  <Target className="w-4 h-4 text-blue-600" />
+                  <div>
+                    <p className="text-xs text-gray-500 uppercase tracking-wide">Gig</p>
+                    <p className="font-medium text-gray-800">{selectedScript.gig?.title || selectedScript.gig?.category || selectedScript.gigId}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <User className="w-4 h-4 text-purple-600" />
+                  <div>
+                    <p className="text-xs text-gray-500 uppercase tracking-wide">Target Client</p>
+                    <p className="font-medium text-gray-800">{selectedScript.targetClient}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Globe className="w-4 h-4 text-green-600" />
+                  <div>
+                    <p className="text-xs text-gray-500 uppercase tracking-wide">Language</p>
+                    <p className="font-medium text-gray-800">{selectedScript.language}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-orange-600" />
+                  <div>
+                    <p className="text-xs text-gray-500 uppercase tracking-wide">Created</p>
+                    <p className="font-medium text-gray-800">{new Date(selectedScript.createdAt).toLocaleDateString()}</p>
+                  </div>
+                </div>
+              </div>
+              {selectedScript.details && (
+                <div className="mt-4 p-4 bg-blue-50 rounded-xl">
+                  <p className="text-sm text-gray-600"><span className="font-medium">Context:</span> {selectedScript.details}</p>
+                </div>
+              )}
+            </div>
+
+            <div className="p-6">
+              <div className="space-y-6">
+                {Array.isArray(selectedScript.script) && selectedScript.script.length > 0 ? (
+                  selectedScript.script.map((step, idx) => (
+                    <div key={idx} className="flex items-start gap-4 group">
+                      <div className="flex-shrink-0 mt-1">
+                        {step.actor === 'agent' ? (
+                          <div className="p-3 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl shadow-lg">
+                            <Headphones className="w-5 h-5 text-white" />
+                          </div>
+                        ) : (
+                          <div className="p-3 bg-gradient-to-r from-green-500 to-green-600 rounded-xl shadow-lg">
+                            <User className="w-5 h-5 text-white" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="mb-2">
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wide bg-gray-100 text-gray-600">
+                            {step.phase}
+                          </span>
+                        </div>
+                        <div className={
+                          'rounded-2xl px-6 py-4 shadow-md border-l-4 transition-all duration-200 group-hover:shadow-lg ' +
+                          (step.actor === 'agent'
+                            ? 'bg-gradient-to-r from-blue-50 to-blue-100 border-blue-500 text-blue-900'
+                            : 'bg-gradient-to-r from-green-50 to-green-100 border-green-500 text-green-900')
+                        }>
+                          <div className="flex items-start gap-3">
+                            <span className="font-bold text-sm uppercase tracking-wide opacity-75">
+                              {step.actor === 'agent' ? 'Agent' : 'Lead'}:
+                            </span>
+                            <p className="flex-1 leading-relaxed">{step.replica}</p>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <div className={
-                      'rounded-xl px-4 py-3 shadow-sm ' +
-                      (step.actor === 'agent'
-                        ? 'bg-blue-50 text-blue-900'
-                        : 'bg-green-50 text-green-900')
-                    }>
-                      <span className="font-bold mr-2">{step.actor === 'agent' ? 'Agent' : 'Lead'}:</span>
-                      <span>{step.replica}</span>
+                  ))
+                ) : (
+                  <div className="text-center py-12">
+                    <div className="p-4 bg-gray-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                      <Headphones className="w-8 h-8 text-gray-400" />
+                    </div>
+                    <p className="text-gray-500">No script content available</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Script Generation Form */}
+        {view === 'form' && (
+          <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden animate-fadeIn">
+            <div className="p-6 bg-gradient-to-r from-purple-600 to-blue-600 text-white">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-white/20 rounded-xl">
+                  <Plus className="w-8 h-8" />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold">Create New Script</h3>
+                  <p className="text-purple-100">Generate a personalized call script for your gig</p>
+                </div>
+              </div>
+            </div>
+
+            <form onSubmit={handleSubmit} className="p-8 space-y-6">
+              <div className="grid md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Select Gig <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={selectedGig?._id || ''}
+                    onChange={e => handleGigSelectInForm(e.target.value)}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white"
+                    required
+                  >
+                    <option value="">Choose a gig to create script for...</option>
+                    {gigs.map(gig => (
+                      <option key={gig._id} value={gig._id}>{gig.title || gig.category}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Domain</label>
+                  <input
+                    type="text"
+                    value={domaine}
+                    readOnly
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl bg-gray-50 text-gray-600 cursor-not-allowed"
+                    placeholder="Auto-filled from selected gig"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Target Client (DISC Profile) <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={typeClient}
+                  onChange={e => setTypeClient(e.target.value)}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white"
+                  required
+                >
+                  <option value="">Select client personality type...</option>
+                  <option value="D">🎯 D: Direct and results-oriented</option>
+                  <option value="I">🤝 I: Enthusiastic and relational</option>
+                  <option value="S">🛡️ S: Reassuring and stable</option>
+                  <option value="C">📊 C: Structured and analytical</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Context <span className="text-gray-400">(optional but recommended)</span>
+                </label>
+                <textarea
+                  value={contexte}
+                  onChange={e => setContexte(e.target.value)}
+                  placeholder="Provide additional context like client history, emotional state, common objections, or specific situation details..."
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white resize-none"
+                  rows={3}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Language & Tone <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={langueTon}
+                  onChange={e => setLangueTon(e.target.value)}
+                  placeholder="e.g., Professional yet warm, Casual and friendly, Formal and authoritative..."
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white"
+                  required
+                />
+              </div>
+
+              <div className="pt-4">
+                <button
+                  type="submit"
+                  disabled={
+                    isLoading ||
+                    !selectedGig ||
+                    !domaine.trim() ||
+                    !typeClient.trim() ||
+                    !langueTon.trim()
+                  }
+                  className="w-full px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-4 focus:ring-blue-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 font-semibold text-lg shadow-lg hover:shadow-xl transition-all duration-200"
+                >
+                  {isLoading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+                      Generating Your Script...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-6 h-6" />
+                      Generate Script
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {error && (
+                <div className="p-6 bg-red-50 border-2 border-red-200 rounded-xl animate-shake">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-red-100 rounded-lg">
+                      <svg className="w-5 h-5 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-red-800 font-semibold">Something went wrong</p>
+                      <p className="text-red-700 text-sm mt-1">{error}</p>
                     </div>
                   </div>
                 </div>
-              ))
-            ) : (
-              <div className="text-gray-400 italic">No script content available.</div>
-            )}
+              )}
+            </form>
           </div>
-        </div>
-      )}
-      {/* Script Generation Form */}
-      {view === 'form' && (
-        <form onSubmit={handleSubmit} className="mb-8 space-y-4 bg-white border rounded-lg shadow p-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Gig <span className="text-red-500">*</span></label>
-            <select
-              value={selectedGig?._id || ''}
-              onChange={e => handleGigSelectInForm(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              required
-            >
-              <option value="">Select a gig</option>
-              {gigs.map(gig => (
-                <option key={gig._id} value={gig._id}>{gig.title || gig.category}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Domain</label>
-            <input
-              type="text"
-              value={domaine}
-              readOnly
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-700 cursor-not-allowed focus:ring-0 focus:border-gray-300"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Target Client (DISC) <span className="text-red-500">*</span></label>
-            <select
-              value={typeClient}
-              onChange={e => setTypeClient(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              required
-            >
-              <option value="">Select a DISC profile</option>
-              <option value="D">D: Direct and results-oriented</option>
-              <option value="I">I: Enthusiastic and relational</option>
-              <option value="S">S: Reassuring and stable</option>
-              <option value="C">C: Structured and analytical</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Context (optional but recommended)</label>
-            <input
-              type="text"
-              value={contexte}
-              onChange={e => setContexte(e.target.value)}
-              placeholder="e.g. Client history, emotion, objections..."
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Language & Tone <span className="text-red-500">*</span></label>
-            <input
-              type="text"
-              value={langueTon}
-              onChange={e => setLangueTon(e.target.value)}
-              placeholder="e.g. Formal, warm, professional..."
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              required
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={
-              isLoading ||
-              !selectedGig ||
-              !domaine.trim() ||
-              !typeClient.trim() ||
-              !langueTon.trim()
-            }
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-          >
-            {isLoading ? 'Generating...' : 'Generate Script'}
-          </button>
-          {error && (
-            <div className="p-4 mb-6 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-red-800 font-medium">An error occurred</p>
-              <p className="text-red-700 mt-1">{error}</p>
-            </div>
-          )}
-        </form>
-      )}
+        )}
+      </div>
+
+      <style jsx>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          25% { transform: translateX(-5px); }
+          75% { transform: translateX(5px); }
+        }
+        .animate-fadeIn {
+          animation: fadeIn 0.3s ease-out;
+        }
+        .animate-shake {
+          animation: shake 0.5s ease-in-out;
+        }
+      `}</style>
     </div>
   );
 };
