@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import apiClient from '../api/client';
 import Cookies from 'js-cookie';
+import { User, Headphones } from 'lucide-react';
 
 interface ScriptResponse {
   success: boolean;
@@ -162,7 +163,7 @@ const ScriptGenerator: React.FC = () => {
   const [isLoadingScripts, setIsLoadingScripts] = useState(false);
   const [scriptsError, setScriptsError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
-  const [showScriptId, setShowScriptId] = useState<string | null>(null);
+  const [selectedScript, setSelectedScript] = useState<Script | null>(null);
 
   const getCompanyId = () => {
     const runMode = import.meta.env.VITE_RUN_MODE || 'in-app';
@@ -336,86 +337,121 @@ const ScriptGenerator: React.FC = () => {
     setDomaine(gig?.category || '');
   };
 
-  const toggleShowScript = (scriptId: string) => {
-    setShowScriptId(prev => prev === scriptId ? null : scriptId);
+  const handleShowScript = (script: Script) => {
+    setSelectedScript(prev => prev?._id === script._id ? null : script);
   };
 
   return (
     <div className="max-w-5xl mx-auto p-6">
       <div className="mb-8 flex items-center justify-between">
-        <h2 className="text-2xl font-bold mb-2">Scripts générés</h2>
+        <h2 className="text-2xl font-bold mb-2">Generated Scripts</h2>
         <button
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow transition"
           onClick={() => setShowForm(v => !v)}
         >
-          {showForm ? 'Annuler' : 'Générer un nouveau script'}
+          {showForm ? 'Cancel' : 'Generate a new script'}
         </button>
       </div>
-      {/* Tableau des scripts */}
+      {/* Enhanced Table of Scripts */}
       <div className="overflow-x-auto mb-10">
         {isLoadingScripts ? (
-          <div className="text-gray-600">Chargement des scripts...</div>
+          <div className="text-gray-600">Loading scripts...</div>
         ) : scriptsError ? (
           <div className="p-2 bg-red-50 border border-red-200 rounded-lg text-red-700">{scriptsError}</div>
         ) : scripts.length === 0 ? (
-          <div className="text-gray-500 italic">Aucun script généré pour cette société.</div>
+          <div className="text-gray-500 italic">No scripts generated for this company.</div>
         ) : (
-          <table className="min-w-full border text-sm">
-            <thead className="bg-gray-100">
+          <table className="min-w-full border rounded-lg overflow-hidden shadow-sm">
+            <thead className="bg-blue-50">
               <tr>
-                <th className="px-3 py-2 border">Gig</th>
-                <th className="px-3 py-2 border">Client cible</th>
-                <th className="px-3 py-2 border">Langue</th>
-                <th className="px-3 py-2 border">Date</th>
-                <th className="px-3 py-2 border">Action</th>
+                <th className="px-4 py-2 border-b text-left">Gig</th>
+                <th className="px-4 py-2 border-b text-left">Target Client</th>
+                <th className="px-4 py-2 border-b text-left">Language</th>
+                <th className="px-4 py-2 border-b text-left">Date</th>
+                <th className="px-4 py-2 border-b text-center">Action</th>
               </tr>
             </thead>
             <tbody>
-              {scripts.map(script => {
-                const gig = gigs.find(g => g._id === script.gigId);
+              {scripts.map((script, idx) => {
+                const gig = script.gig || gigs.find(g => g._id === script.gigId);
                 return (
-                  <React.Fragment key={script._id}>
-                    <tr>
-                      <td className="px-3 py-2 border font-semibold">{gig?.title || gig?.category || script.gigId}</td>
-                      <td className="px-3 py-2 border">{script.targetClient}</td>
-                      <td className="px-3 py-2 border">{script.language}</td>
-                      <td className="px-3 py-2 border">{new Date(script.createdAt).toLocaleString()}</td>
-                      <td className="px-3 py-2 border text-center">
-                        <button
-                          className="text-blue-600 underline hover:text-blue-800"
-                          onClick={() => toggleShowScript(script._id)}
-                        >
-                          {showScriptId === script._id ? 'Masquer' : 'Afficher'}
-                        </button>
-                      </td>
-                    </tr>
-                    {showScriptId === script._id && (
-                      <tr>
-                        <td colSpan={5} className="bg-blue-50 px-4 py-3">
-                          {Array.isArray(script.script) && script.script.length > 0 ? (
-                            <div className="pl-2 border-l-4 border-blue-200">
-                              {script.script.map((step, idx) => (
-                                <div key={idx} className="mb-1">
-                                  <span className="font-semibold text-blue-700">[{step.phase}]</span>{' '}
-                                  <span className={`font-semibold ${step.actor === 'agent' ? 'text-green-700' : 'text-purple-700'}`}>{step.actor === 'agent' ? 'Agent' : 'Lead'}:</span>{' '}
-                                  <span className="text-gray-800">{step.replica}</span>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="text-gray-400 italic">Script vide ou non disponible.</div>
-                          )}
-                        </td>
-                      </tr>
-                    )}
-                  </React.Fragment>
+                  <tr
+                    key={script._id}
+                    className={
+                      (idx % 2 === 0 ? 'bg-white' : 'bg-gray-50') +
+                      (selectedScript?._id === script._id ? ' ring-2 ring-blue-200' : '')
+                    }
+                  >
+                    <td className="px-4 py-2 border-b font-semibold">{gig?.title || gig?.category || script.gigId}</td>
+                    <td className="px-4 py-2 border-b">{script.targetClient}</td>
+                    <td className="px-4 py-2 border-b">{script.language}</td>
+                    <td className="px-4 py-2 border-b">{new Date(script.createdAt).toLocaleString()}</td>
+                    <td className="px-4 py-2 border-b text-center">
+                      <button
+                        className="text-blue-600 underline hover:text-blue-800 font-medium transition"
+                        onClick={() => handleShowScript(script)}
+                      >
+                        {selectedScript?._id === script._id ? 'Hide' : 'Show'}
+                      </button>
+                    </td>
+                  </tr>
                 );
               })}
             </tbody>
           </table>
         )}
       </div>
-      {/* Formulaire de génération de script */}
+      {/* Modern Script Display Panel */}
+      {selectedScript && (
+        <div className="mb-10 p-6 bg-white border rounded-xl shadow-lg animate-fade-in">
+          <h3 className="text-xl font-bold mb-4 text-blue-700 flex items-center gap-2">
+            <Headphones className="w-6 h-6 text-blue-500" /> Call Script
+          </h3>
+          <div className="mb-2 text-gray-600 text-sm flex flex-wrap gap-4">
+            <span><b>Gig:</b> {selectedScript.gig?.title || selectedScript.gig?.category || selectedScript.gigId}</span>
+            <span><b>Target Client:</b> {selectedScript.targetClient}</span>
+            <span><b>Language:</b> {selectedScript.language}</span>
+            {selectedScript.details && <span><b>Context:</b> {selectedScript.details}</span>}
+            <span><b>Date:</b> {new Date(selectedScript.createdAt).toLocaleString()}</span>
+          </div>
+          <div className="flex flex-col gap-4 mt-6">
+            {Array.isArray(selectedScript.script) && selectedScript.script.length > 0 ? (
+              selectedScript.script.map((step, idx) => (
+                <div key={idx} className="flex items-start gap-3">
+                  <div className="flex-shrink-0 mt-1">
+                    {step.actor === 'agent' ? (
+                      <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100">
+                        <Headphones className="w-5 h-5 text-blue-600" />
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-green-100">
+                        <User className="w-5 h-5 text-green-600" />
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-xs text-gray-500 mb-1 font-semibold uppercase tracking-wide">
+                      {step.phase}
+                    </div>
+                    <div className={
+                      'rounded-xl px-4 py-3 shadow-sm ' +
+                      (step.actor === 'agent'
+                        ? 'bg-blue-50 text-blue-900'
+                        : 'bg-green-50 text-green-900')
+                    }>
+                      <span className="font-bold mr-2">{step.actor === 'agent' ? 'Agent' : 'Lead'}:</span>
+                      <span>{step.replica}</span>
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-gray-400 italic">No script content available.</div>
+            )}
+          </div>
+        </div>
+      )}
+      {/* Script Generation Form */}
       {showForm && (
         <form onSubmit={handleSubmit} className="mb-8 space-y-4 bg-white border rounded-lg shadow p-6">
           <div>
@@ -426,14 +462,14 @@ const ScriptGenerator: React.FC = () => {
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               required
             >
-              <option value="">Sélectionner un gig</option>
+              <option value="">Select a gig</option>
               {gigs.map(gig => (
                 <option key={gig._id} value={gig._id}>{gig.title || gig.category}</option>
               ))}
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Domaine</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Domain</label>
             <input
               type="text"
               value={domaine}
@@ -443,37 +479,37 @@ const ScriptGenerator: React.FC = () => {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Type de client (DISC) <span className="text-red-500">*</span></label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Target Client (DISC) <span className="text-red-500">*</span></label>
             <select
               value={typeClient}
               onChange={e => setTypeClient(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               required
             >
-              <option value="">Sélectionner un profil DISC</option>
-              <option value="D">D : Direct et axé sur les résultats</option>
-              <option value="I">I : Enthousiaste et relationnel</option>
-              <option value="S">S : Rassurant et stable</option>
-              <option value="C">C : Structuré et analytique</option>
+              <option value="">Select a DISC profile</option>
+              <option value="D">D: Direct and results-oriented</option>
+              <option value="I">I: Enthusiastic and relational</option>
+              <option value="S">S: Reassuring and stable</option>
+              <option value="C">C: Structured and analytical</option>
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Contexte spécifique (optionnel mais recommandé)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Context (optional but recommended)</label>
             <input
               type="text"
               value={contexte}
               onChange={e => setContexte(e.target.value)}
-              placeholder="e.g. Historique client, émotion, objections..."
+              placeholder="e.g. Client history, emotion, objections..."
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Langue & ton souhaité <span className="text-red-500">*</span></label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Language & Tone <span className="text-red-500">*</span></label>
             <input
               type="text"
               value={langueTon}
               onChange={e => setLangueTon(e.target.value)}
-              placeholder="e.g. Formel, chaleureux, professionnel..."
+              placeholder="e.g. Formal, warm, professional..."
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               required
             />
@@ -489,11 +525,11 @@ const ScriptGenerator: React.FC = () => {
             }
             className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
-            {isLoading ? 'Génération en cours...' : 'Générer le script'}
+            {isLoading ? 'Generating...' : 'Generate Script'}
           </button>
           {error && (
             <div className="p-4 mb-6 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-red-800 font-medium">Une erreur est survenue</p>
+              <p className="text-red-800 font-medium">An error occurred</p>
               <p className="text-red-700 mt-1">{error}</p>
             </div>
           )}
