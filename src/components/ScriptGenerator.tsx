@@ -135,6 +135,17 @@ interface Gig {
   updatedAt: string;
 }
 
+interface Script {
+  _id: string;
+  gigId: string;
+  targetClient: string;
+  language: string;
+  details?: string;
+  script: { phase: string; actor: string; replica: string }[];
+  createdAt: string;
+  gig?: Gig;
+}
+
 const ScriptGenerator: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [response, setResponse] = useState<ScriptResponse | null>(null);
@@ -147,6 +158,11 @@ const ScriptGenerator: React.FC = () => {
   const [selectedGig, setSelectedGig] = useState<Gig | null>(null);
   const [isLoadingGigs, setIsLoadingGigs] = useState(false);
   const [gigsError, setGigsError] = useState<string | null>(null);
+  const [scripts, setScripts] = useState<Script[]>([]);
+  const [isLoadingScripts, setIsLoadingScripts] = useState(false);
+  const [scriptsError, setScriptsError] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [showScriptId, setShowScriptId] = useState<string | null>(null);
 
   const getCompanyId = () => {
     const runMode = import.meta.env.VITE_RUN_MODE || 'in-app';
@@ -203,8 +219,54 @@ const ScriptGenerator: React.FC = () => {
     }
   };
 
+  const fetchAllScripts = async () => {
+    setIsLoadingScripts(true);
+    setScriptsError(null);
+    try {
+      const companyId = getCompanyId();
+      if (!companyId) throw new Error('Company ID not found');
+      const backendUrl = import.meta.env.VITE_BACKEND_API;
+      if (!backendUrl) throw new Error('Backend API URL not configured');
+      const url = `${backendUrl}/api/scripts/company/${companyId}`;
+      console.log('[SCRIPTS] Fetching all scripts for companyId:', companyId, 'URL:', url);
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`Failed to fetch scripts: ${response.statusText}`);
+      const data = await response.json();
+      console.log('[SCRIPTS] API response:', data);
+      setScripts(Array.isArray(data.data) ? data.data : []);
+    } catch (err: any) {
+      console.error('[SCRIPTS] Error fetching scripts:', err);
+      setScriptsError(err.message || 'Failed to fetch scripts');
+    } finally {
+      setIsLoadingScripts(false);
+    }
+  };
+
+  const fetchScriptsForGig = async (gigId: string) => {
+    setIsLoadingScripts(true);
+    setScriptsError(null);
+    try {
+      const backendUrl = import.meta.env.VITE_BACKEND_API;
+      if (!backendUrl) throw new Error('Backend API URL not configured');
+      const url = `${backendUrl}/scripts/gig/${gigId}`;
+      console.log('[SCRIPTS] Fetching scripts for gigId:', gigId, 'URL:', url);
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`Failed to fetch scripts: ${response.statusText}`);
+      const data = await response.json();
+      console.log('[SCRIPTS] API response:', data);
+      setScripts(Array.isArray(data.data) ? data.data : []);
+    } catch (err: any) {
+      console.error('[SCRIPTS] Error fetching scripts for gig:', err);
+      setScriptsError(err.message || 'Failed to fetch scripts for this gig');
+      setScripts([]);
+    } finally {
+      setIsLoadingScripts(false);
+    }
+  };
+
   useEffect(() => {
     fetchGigs();
+    fetchAllScripts();
   }, []);
 
   const handleGigSelection = (gig: Gig) => {
@@ -253,6 +315,14 @@ const ScriptGenerator: React.FC = () => {
         // Log but do not block script creation
         console.error('Failed to update onboarding progress (script):', err);
       }
+      // Refresh scripts list and hide form
+      await fetchAllScripts();
+      setShowForm(false);
+      setSelectedGig(null);
+      setTypeClient('');
+      setLangueTon('');
+      setContexte('');
+      setDomaine('');
     } catch (err: any) {
       setError(err.response?.data?.error || err.message || 'Failed to generate script');
     } finally {
@@ -260,83 +330,108 @@ const ScriptGenerator: React.FC = () => {
     }
   };
 
+  const handleGigSelectInForm = (gigId: string) => {
+    const gig = gigs.find(g => g._id === gigId) || null;
+    setSelectedGig(gig);
+    setDomaine(gig?.category || '');
+  };
+
+  const toggleShowScript = (scriptId: string) => {
+    setShowScriptId(prev => prev === scriptId ? null : scriptId);
+  };
+
   return (
-    <div className="max-w-3xl mx-auto p-6">
-      {/* Back arrow for in-app mode */}
-      {isInAppMode() && (
-        <div className="mb-6">
-          <button
-            onClick={handleBackToOrchestrator}
-            className="flex items-center gap-2 text-blue-600 hover:text-blue-800 transition-colors"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            <span>Back to Orchestrator</span>
-          </button>
-        </div>
-      )}
-
-      <div className="mb-8">
-        <h2 className="text-2xl font-bold mb-2">Script Generator</h2>
-        <p className="text-gray-600">
-          Generate a call script based on your company knowledge base (documents & call recordings).
-        </p>
+    <div className="max-w-5xl mx-auto p-6">
+      <div className="mb-8 flex items-center justify-between">
+        <h2 className="text-2xl font-bold mb-2">Scripts générés</h2>
+        <button
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          onClick={() => setShowForm(v => !v)}
+        >
+          {showForm ? 'Annuler' : 'Générer un nouveau script'}
+        </button>
       </div>
-
-      {/* Gigs Selection */}
-      <div className="mb-8">
-        <h3 className="text-lg font-semibold mb-4">Select a Gig</h3>
-        {isLoadingGigs ? (
-          <div className="text-gray-600">Loading gigs...</div>
-        ) : gigsError ? (
-          <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-red-800 font-medium">Error loading gigs</p>
-            <p className="text-red-700 mt-1">{gigsError}</p>
-          </div>
-        ) : gigs.length === 0 ? (
-          <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <p className="text-yellow-800">No gigs found for this company.</p>
-          </div>
+      {/* Tableau des scripts */}
+      <div className="overflow-x-auto mb-10">
+        {isLoadingScripts ? (
+          <div className="text-gray-600">Chargement des scripts...</div>
+        ) : scriptsError ? (
+          <div className="p-2 bg-red-50 border border-red-200 rounded-lg text-red-700">{scriptsError}</div>
+        ) : scripts.length === 0 ? (
+          <div className="text-gray-500 italic">Aucun script généré pour cette société.</div>
         ) : (
-          <div className="grid gap-3">
-            {gigs.map((gig) => (
-              <div
-                key={gig._id}
-                onClick={() => handleGigSelection(gig)}
-                className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                  selectedGig?._id === gig._id
-                    ? 'border-blue-500 bg-blue-50'
-                    : 'border-gray-200 hover:border-gray-300'
-                }`}
-              >
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h4 className="font-semibold text-gray-900">{gig.title || 'Untitled Gig'}</h4>
-                    <p className="text-sm text-gray-600 mt-1">
-                      {gig.description ? gig.description.substring(0, 100) + '...' : 'No description'}
-                    </p>
-                    {gig.category && (
-                      <span className="inline-block mt-2 px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded">
-                        {gig.category}
-                      </span>
+          <table className="min-w-full border text-sm">
+            <thead className="bg-gray-100">
+              <tr>
+                <th className="px-3 py-2 border">Gig</th>
+                <th className="px-3 py-2 border">Client cible</th>
+                <th className="px-3 py-2 border">Langue</th>
+                <th className="px-3 py-2 border">Date</th>
+                <th className="px-3 py-2 border">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {scripts.map(script => {
+                const gig = gigs.find(g => g._id === script.gigId);
+                return (
+                  <React.Fragment key={script._id}>
+                    <tr>
+                      <td className="px-3 py-2 border font-semibold">{gig?.title || gig?.category || script.gigId}</td>
+                      <td className="px-3 py-2 border">{script.targetClient}</td>
+                      <td className="px-3 py-2 border">{script.language}</td>
+                      <td className="px-3 py-2 border">{new Date(script.createdAt).toLocaleString()}</td>
+                      <td className="px-3 py-2 border text-center">
+                        <button
+                          className="text-blue-600 underline hover:text-blue-800"
+                          onClick={() => toggleShowScript(script._id)}
+                        >
+                          {showScriptId === script._id ? 'Masquer' : 'Afficher'}
+                        </button>
+                      </td>
+                    </tr>
+                    {showScriptId === script._id && (
+                      <tr>
+                        <td colSpan={5} className="bg-blue-50 px-4 py-3">
+                          {Array.isArray(script.script) && script.script.length > 0 ? (
+                            <div className="pl-2 border-l-4 border-blue-200">
+                              {script.script.map((step, idx) => (
+                                <div key={idx} className="mb-1">
+                                  <span className="font-semibold text-blue-700">[{step.phase}]</span>{' '}
+                                  <span className={`font-semibold ${step.actor === 'agent' ? 'text-green-700' : 'text-purple-700'}`}>{step.actor === 'agent' ? 'Agent' : 'Lead'}:</span>{' '}
+                                  <span className="text-gray-800">{step.replica}</span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="text-gray-400 italic">Script vide ou non disponible.</div>
+                          )}
+                        </td>
+                      </tr>
                     )}
-                  </div>
-                  {selectedGig?._id === gig._id && (
-                    <svg className="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
+                  </React.Fragment>
+                );
+              })}
+            </tbody>
+          </table>
         )}
       </div>
-
       {/* Formulaire de génération de script */}
-      {gigs.length > 0 && (
-        <form onSubmit={handleSubmit} className="mb-8 space-y-4">
+      {showForm && (
+        <form onSubmit={handleSubmit} className="mb-8 space-y-4 bg-white border rounded-lg shadow p-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Gig <span className="text-red-500">*</span></label>
+            <select
+              value={selectedGig?._id || ''}
+              onChange={e => handleGigSelectInForm(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              required
+            >
+              <option value="">Sélectionner un gig</option>
+              {gigs.map(gig => (
+                <option key={gig._id} value={gig._id}>{gig.title || gig.category}</option>
+              ))}
+            </select>
+          </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Domaine</label>
             <input
@@ -396,98 +491,13 @@ const ScriptGenerator: React.FC = () => {
           >
             {isLoading ? 'Génération en cours...' : 'Générer le script'}
           </button>
-        </form>
-      )}
-      {error && (
-        <div className="p-4 mb-6 bg-red-50 border border-red-200 rounded-lg">
-          <p className="text-red-800 font-medium">An error occurred</p>
-          <p className="text-red-700 mt-1">{error}</p>
-        </div>
-      )}
-      {response && response.success && (
-        <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-          <div className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Generated Script</h3>
-            {(() => {
-              let scriptArray: { actor: string; replica: string; phase: string }[] = [];
-              try {
-                scriptArray = typeof response.data?.script === 'string' ? JSON.parse(response.data.script) : [];
-              } catch (e) {
-                return <div className="text-red-600">Failed to parse script. Please try again or refine your prompt.</div>;
-              }
-              if (!Array.isArray(scriptArray) || scriptArray.length === 0) {
-                return <div className="text-gray-500 italic">No script generated.</div>;
-              }
-              // Group by phase
-              const phases = [
-                "Context & Preparation",
-                "SBAM & Opening",
-                "Legal & Compliance",
-                "Need Discovery",
-                "Value Proposition",
-                "Documents/Quote",
-                "Objection Handling",
-                "Confirmation & Closing",
-                "Post-Call Actions"
-              ];
-              const grouped: { [phase: string]: { actor: string; replica: string }[] } = {};
-              scriptArray.forEach(step => {
-                if (!grouped[step.phase]) grouped[step.phase] = [];
-                grouped[step.phase].push({ actor: step.actor, replica: step.replica });
-              });
-              return (
-                <div className="space-y-8">
-                  {phases.filter(phase => grouped[phase]).map(phase => (
-                    <div key={phase}>
-                      <h4 className="text-md font-bold text-blue-700 mb-2">{phase}</h4>
-                      <div className="space-y-2">
-                        {grouped[phase].map((step, idx) => (
-                          <div key={idx} className="flex items-start gap-2">
-                            <span className={`font-semibold ${step.actor === 'agent' ? 'text-green-700' : 'text-purple-700'}`}>{step.actor === 'agent' ? 'Agent' : 'Lead'}:</span>
-                            <span className="text-gray-800">{step.replica}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                  {/* Show any extra phases not in the standard list */}
-                  {Object.keys(grouped).filter(phase => !phases.includes(phase)).map(phase => (
-                    <div key={phase}>
-                      <h4 className="text-md font-bold text-blue-700 mb-2">{phase}</h4>
-                      <div className="space-y-2">
-                        {grouped[phase].map((step, idx) => (
-                          <div key={idx} className="flex items-start gap-2">
-                            <span className={`font-semibold ${step.actor === 'agent' ? 'text-green-700' : 'text-purple-700'}`}>{step.actor === 'agent' ? 'Agent' : 'Lead'}:</span>
-                            <span className="text-gray-800">{step.replica}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              );
-            })()}
-          </div>
-          {response.data?.metadata && (
-            <div className="border-t border-gray-200 bg-gray-50 p-4 rounded-b-lg">
-              <div className="text-sm text-gray-600 space-y-2">
-                <div className="flex items-center gap-4">
-                  <span className="font-semibold text-gray-700">Analyzed Resources:</span>
-                  <span>{response.data.metadata.corpusStatus.totalCount} resources</span>
-                </div>
-                {response.data.metadata.gigInfo && (
-                  <div className="border-t border-gray-200 pt-2 mt-2">
-                    <p className="font-semibold text-gray-700 mb-1">Generated for Gig:</p>
-                    <p><span className="font-semibold text-gray-700">Title:</span> {response.data.metadata.gigInfo.gigTitle}</p>
-                    <p><span className="font-semibold text-gray-700">Category:</span> {response.data.metadata.gigInfo.gigCategory}</p>
-                  </div>
-                )}
-                <p><span className="font-semibold text-gray-700">Model:</span> {response.data.metadata.model}</p>
-                <p><span className="font-semibold text-gray-700">Processed at:</span> {new Date(response.data.metadata.processedAt).toLocaleString()}</p>
-              </div>
+          {error && (
+            <div className="p-4 mb-6 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-red-800 font-medium">Une erreur est survenue</p>
+              <p className="text-red-700 mt-1">{error}</p>
             </div>
           )}
-        </div>
+        </form>
       )}
     </div>
   );
