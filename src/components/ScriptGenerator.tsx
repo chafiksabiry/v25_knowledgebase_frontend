@@ -212,6 +212,21 @@ const ScriptGenerator: React.FC = () => {
     setDomaine(gig.category || '');
   };
 
+  const updateOnboardingProgress = async () => {
+    try {
+      const companyId = getCompanyId();
+      if (!companyId) throw new Error('Company ID not found');
+      const apiUrl = import.meta.env.VITE_API_URL_ONBOARDING;
+      const endpoint = `${apiUrl}/onboarding/companies/${companyId}/onboarding/phases/2/steps/8`;
+      const response = await apiClient.put(endpoint, { status: 'completed' });
+      console.log('Onboarding progress (script) update response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating onboarding progress (script):', error);
+      throw error;
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -230,6 +245,14 @@ const ScriptGenerator: React.FC = () => {
       };
       const apiResponse = await apiClient.post<ScriptResponse>('/rag/generate-script', requestData);
       setResponse(apiResponse.data);
+      // Update onboarding progress for script creation (phase 2, step 8)
+      try {
+        await updateOnboardingProgress();
+        console.log('Successfully updated onboarding progress (script)');
+      } catch (err) {
+        // Log but do not block script creation
+        console.error('Failed to update onboarding progress (script):', err);
+      }
     } catch (err: any) {
       setError(err.response?.data?.error || err.message || 'Failed to generate script');
     } finally {
