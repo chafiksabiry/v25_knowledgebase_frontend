@@ -162,7 +162,7 @@ const ScriptGenerator: React.FC = () => {
   const [scripts, setScripts] = useState<Script[]>([]);
   const [isLoadingScripts, setIsLoadingScripts] = useState(false);
   const [scriptsError, setScriptsError] = useState<string | null>(null);
-  const [showForm, setShowForm] = useState(false);
+  const [view, setView] = useState<'table' | 'form' | 'script'>('table');
   const [selectedScript, setSelectedScript] = useState<Script | null>(null);
 
   const getCompanyId = () => {
@@ -318,12 +318,23 @@ const ScriptGenerator: React.FC = () => {
       }
       // Refresh scripts list and hide form
       await fetchAllScripts();
-      setShowForm(false);
+      setView('table');
       setSelectedGig(null);
       setTypeClient('');
       setLangueTon('');
       setContexte('');
       setDomaine('');
+      // Show the newly created script card (if possible)
+      const scriptId = (apiResponse.data && (apiResponse.data as any).metadata && (apiResponse.data as any).metadata.scriptId) ? (apiResponse.data as any).metadata.scriptId : null;
+      if (scriptId) {
+        setTimeout(() => {
+          setSelectedScript(
+            prev => scripts.find(s => s._id === scriptId) || null
+          );
+        }, 300);
+      } else {
+        setSelectedScript(null);
+      }
     } catch (err: any) {
       setError(err.response?.data?.error || err.message || 'Failed to generate script');
     } finally {
@@ -338,71 +349,101 @@ const ScriptGenerator: React.FC = () => {
   };
 
   const handleShowScript = (script: Script) => {
-    setSelectedScript(prev => prev?._id === script._id ? null : script);
+    setSelectedScript(script);
+    setView('script');
+  };
+
+  const handleShowFormClick = () => {
+    setView(view => view === 'form' ? 'table' : 'form');
+    setSelectedScript(null);
+  };
+
+  const handleBackToTable = () => {
+    setView('table');
+    setSelectedScript(null);
   };
 
   return (
     <div className="max-w-5xl mx-auto p-6">
       <div className="mb-8 flex items-center justify-between">
         <h2 className="text-2xl font-bold mb-2">Generated Scripts</h2>
-        <button
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow transition"
-          onClick={() => setShowForm(v => !v)}
-        >
-          {showForm ? 'Cancel' : 'Generate a new script'}
-        </button>
-      </div>
-      {/* Enhanced Table of Scripts */}
-      <div className="overflow-x-auto mb-10">
-        {isLoadingScripts ? (
-          <div className="text-gray-600">Loading scripts...</div>
-        ) : scriptsError ? (
-          <div className="p-2 bg-red-50 border border-red-200 rounded-lg text-red-700">{scriptsError}</div>
-        ) : scripts.length === 0 ? (
-          <div className="text-gray-500 italic">No scripts generated for this company.</div>
-        ) : (
-          <table className="min-w-full border rounded-lg overflow-hidden shadow-sm">
-            <thead className="bg-blue-50">
-              <tr>
-                <th className="px-4 py-2 border-b text-left">Gig</th>
-                <th className="px-4 py-2 border-b text-left">Target Client</th>
-                <th className="px-4 py-2 border-b text-left">Language</th>
-                <th className="px-4 py-2 border-b text-left">Date</th>
-                <th className="px-4 py-2 border-b text-center">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {scripts.map((script, idx) => {
-                const gig = script.gig || gigs.find(g => g._id === script.gigId);
-                return (
-                  <tr
-                    key={script._id}
-                    className={
-                      (idx % 2 === 0 ? 'bg-white' : 'bg-gray-50') +
-                      (selectedScript?._id === script._id ? ' ring-2 ring-blue-200' : '')
-                    }
-                  >
-                    <td className="px-4 py-2 border-b font-semibold">{gig?.title || gig?.category || script.gigId}</td>
-                    <td className="px-4 py-2 border-b">{script.targetClient}</td>
-                    <td className="px-4 py-2 border-b">{script.language}</td>
-                    <td className="px-4 py-2 border-b">{new Date(script.createdAt).toLocaleString()}</td>
-                    <td className="px-4 py-2 border-b text-center">
-                      <button
-                        className="text-blue-600 underline hover:text-blue-800 font-medium transition"
-                        onClick={() => handleShowScript(script)}
-                      >
-                        {selectedScript?._id === script._id ? 'Hide' : 'Show'}
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        {view !== 'form' && (
+          <button
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow transition"
+            onClick={handleShowFormClick}
+          >
+            Generate a new script
+          </button>
+        )}
+        {view === 'form' && (
+          <button
+            className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 shadow transition"
+            onClick={handleBackToTable}
+          >
+            Back
+          </button>
+        )}
+        {view === 'script' && (
+          <button
+            className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 shadow transition"
+            onClick={handleBackToTable}
+          >
+            Back
+          </button>
         )}
       </div>
-      {/* Modern Script Display Panel */}
-      {selectedScript && (
+      {/* Table view */}
+      {view === 'table' && (
+        <div className="overflow-x-auto mb-10">
+          {isLoadingScripts ? (
+            <div className="text-gray-600">Loading scripts...</div>
+          ) : scriptsError ? (
+            <div className="p-2 bg-red-50 border border-red-200 rounded-lg text-red-700">{scriptsError}</div>
+          ) : scripts.length === 0 ? (
+            <div className="text-gray-500 italic">No scripts generated for this company.</div>
+          ) : (
+            <table className="min-w-full border rounded-lg overflow-hidden shadow-sm">
+              <thead className="bg-blue-50">
+                <tr>
+                  <th className="px-4 py-2 border-b text-left">Gig</th>
+                  <th className="px-4 py-2 border-b text-left">Target Client</th>
+                  <th className="px-4 py-2 border-b text-left">Language</th>
+                  <th className="px-4 py-2 border-b text-left">Date</th>
+                  <th className="px-4 py-2 border-b text-center">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {scripts.map((script, idx) => {
+                  const gig = script.gig || gigs.find(g => g._id === script.gigId);
+                  return (
+                    <tr
+                      key={script._id}
+                      className={
+                        (idx % 2 === 0 ? 'bg-white' : 'bg-gray-50')
+                      }
+                    >
+                      <td className="px-4 py-2 border-b font-semibold">{gig?.title || gig?.category || script.gigId}</td>
+                      <td className="px-4 py-2 border-b">{script.targetClient}</td>
+                      <td className="px-4 py-2 border-b">{script.language}</td>
+                      <td className="px-4 py-2 border-b">{new Date(script.createdAt).toLocaleString()}</td>
+                      <td className="px-4 py-2 border-b text-center">
+                        <button
+                          className="text-blue-600 underline hover:text-blue-800 font-medium transition"
+                          onClick={() => handleShowScript(script)}
+                        >
+                          Show
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+      {/* Script detail view */}
+      {view === 'script' && selectedScript && (
         <div className="mb-10 p-6 bg-white border rounded-xl shadow-lg animate-fade-in">
           <h3 className="text-xl font-bold mb-4 text-blue-700 flex items-center gap-2">
             <Headphones className="w-6 h-6 text-blue-500" /> Call Script
@@ -452,7 +493,7 @@ const ScriptGenerator: React.FC = () => {
         </div>
       )}
       {/* Script Generation Form */}
-      {showForm && (
+      {view === 'form' && (
         <form onSubmit={handleSubmit} className="mb-8 space-y-4 bg-white border rounded-lg shadow p-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Gig <span className="text-red-500">*</span></label>
