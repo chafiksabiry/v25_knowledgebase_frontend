@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import apiClient from '../api/client';
 import Cookies from 'js-cookie';
-import { User, Headphones, Plus, ArrowLeft, Eye, Calendar, Target, Globe } from 'lucide-react';
+import { User, Headphones, Plus, ArrowLeft, Eye, Calendar, Target, Globe, Trash2 } from 'lucide-react';
 
 interface ScriptResponse {
   success: boolean;
@@ -164,6 +164,7 @@ const ScriptGenerator: React.FC = () => {
   const [scriptsError, setScriptsError] = useState<string | null>(null);
   const [view, setView] = useState<'table' | 'form' | 'script'>('table');
   const [selectedScript, setSelectedScript] = useState<Script | null>(null);
+  const [deletingScriptId, setDeletingScriptId] = useState<string | null>(null);
 
   const getCompanyId = () => {
     const runMode = import.meta.env.VITE_RUN_MODE || 'in-app';
@@ -363,6 +364,44 @@ const ScriptGenerator: React.FC = () => {
     setSelectedScript(null);
   };
 
+  const handleDeleteScript = async (scriptId: string) => {
+    if (!confirm('Are you sure you want to delete this script? This action cannot be undone.')) {
+      return;
+    }
+
+    setDeletingScriptId(scriptId);
+    try {
+      const backendUrl = import.meta.env.VITE_BACKEND_API;
+      if (!backendUrl) throw new Error('Backend API URL not configured');
+      
+      const response = await fetch(`${backendUrl}/api/scripts/${scriptId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to delete script: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('[SCRIPTS] Script deleted successfully:', data);
+
+      // Remove the script from the local state
+      setScripts(prevScripts => prevScripts.filter(script => script._id !== scriptId));
+      
+      // If the deleted script was selected, clear the selection and go back to table
+      if (selectedScript?._id === scriptId) {
+        setSelectedScript(null);
+        setView('table');
+      }
+
+    } catch (err: any) {
+      console.error('[SCRIPTS] Error deleting script:', err);
+      alert(`Failed to delete script: ${err.message}`);
+    } finally {
+      setDeletingScriptId(null);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
       <div className="max-w-6xl mx-auto p-6">
@@ -466,7 +505,7 @@ const ScriptGenerator: React.FC = () => {
                       <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Target Client</th>
                       <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Language</th>
                       <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Created</th>
-                      <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">Action</th>
+                      <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -506,13 +545,29 @@ const ScriptGenerator: React.FC = () => {
                             </div>
                           </td>
                           <td className="px-6 py-4 text-center">
-                            <button
-                              className="inline-flex items-center gap-2 px-4 py-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-all duration-200 font-medium"
-                              onClick={() => handleShowScript(script)}
-                            >
-                              <Eye className="w-4 h-4" />
-                              View Script
-                            </button>
+                            <div className="flex items-center justify-center gap-2">
+                              <button
+                                className="inline-flex items-center gap-1 px-3 py-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-all duration-200 font-medium"
+                                onClick={() => handleShowScript(script)}
+                                title="View script"
+                              >
+                                <Eye className="w-4 h-4" />
+                                View
+                              </button>
+                              <button
+                                className="inline-flex items-center gap-1 px-3 py-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-all duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                                onClick={() => handleDeleteScript(script._id)}
+                                disabled={deletingScriptId === script._id}
+                                title="Delete script"
+                              >
+                                {deletingScriptId === script._id ? (
+                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>
+                                ) : (
+                                  <Trash2 className="w-4 h-4" />
+                                )}
+                                {deletingScriptId === script._id ? 'Deleting...' : 'Delete'}
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
