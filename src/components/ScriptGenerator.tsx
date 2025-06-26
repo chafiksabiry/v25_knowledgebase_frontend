@@ -526,7 +526,7 @@ const ScriptGenerator: React.FC = () => {
 
         {/* Script detail view */}
         {view === 'script' && selectedScript && (
-          <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden animate-fadeIn">
+          <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden animate-fade-in">
             <div className="p-6 bg-gradient-to-r from-blue-600 to-purple-600 text-white">
               <div className="flex items-center gap-4">
                 <div className="p-3 bg-white/20 rounded-xl">
@@ -605,11 +605,11 @@ const ScriptGenerator: React.FC = () => {
                             ? 'bg-gradient-to-r from-blue-50 to-blue-100 border-blue-500 text-blue-900'
                             : 'bg-gradient-to-r from-green-50 to-green-100 border-green-500 text-green-900')
                         }>
-                          <div className="flex items-start gap-3">
+                          <div className="flex flex-col gap-2">
                             <span className="font-bold text-sm uppercase tracking-wide opacity-75">
                               {step.actor === 'agent' ? 'Agent' : 'Lead'}:
                             </span>
-                            <p className="flex-1 leading-relaxed">{step.replica}</p>
+                            <p className="leading-relaxed ml-0">{step.replica}</p>
                           </div>
                         </div>
                       </div>
@@ -630,7 +630,7 @@ const ScriptGenerator: React.FC = () => {
 
         {/* Script Generation Form */}
         {view === 'form' && (
-          <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden animate-fadeIn">
+          <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden animate-fade-in">
             <div className="p-6 bg-gradient-to-r from-purple-600 to-blue-600 text-white">
               <div className="flex items-center gap-4">
                 <div className="p-3 bg-white/20 rounded-xl">
@@ -746,7 +746,7 @@ const ScriptGenerator: React.FC = () => {
               </div>
 
               {error && (
-                <div className="p-6 bg-red-50 border-2 border-red-200 rounded-xl animate-shake">
+                <div className="p-6 bg-red-50 border-2 border-red-200 rounded-xl animate-bounce">
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-red-100 rounded-lg">
                       <svg className="w-5 h-5 text-red-600" fill="currentColor" viewBox="0 0 20 20">
@@ -765,23 +765,7 @@ const ScriptGenerator: React.FC = () => {
         )}
       </div>
 
-      <style jsx>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(20px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes shake {
-          0%, 100% { transform: translateX(0); }
-          25% { transform: translateX(-5px); }
-          75% { transform: translateX(5px); }
-        }
-        .animate-fadeIn {
-          animation: fadeIn 0.3s ease-out;
-        }
-        .animate-shake {
-          animation: shake 0.5s ease-in-out;
-        }
-      `}</style>
+
     </div>
   );
 };
