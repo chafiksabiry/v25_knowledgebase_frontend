@@ -1598,7 +1598,7 @@ const KnowledgeBase: React.FC = () => {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-800 mb-2">Knowledge Base</h1>
         <p className="text-gray-600">
-          Upload documentation, videos, links, and call recordings to build your company's knowledge base.
+          Upload documents and call recordings to build your company's knowledge base.
           The AI will use this information to provide better insights and assistance when handling contacts.
         </p>
       </div>
