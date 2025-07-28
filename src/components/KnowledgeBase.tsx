@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, File, FileText, Video, Link as LinkIcon, Plus, Search, Trash2, Filter, Download, Mic, Play, Clock, Pause, ChevronDown, ChevronUp, X, ExternalLink, Eye, ArrowLeft, Brain, Loader2, RefreshCw } from 'lucide-react';
+import { Upload, File, FileText, Video, Link as LinkIcon, Plus, Trash2, Filter, Download, Mic, Play, Clock, Pause, ChevronDown, ChevronUp, X, ExternalLink, Eye, ArrowLeft, Brain, Loader2, RefreshCw, Languages } from 'lucide-react';
 import { format } from 'date-fns';
 import { KnowledgeItem, CallRecord } from '../types';
 import apiClient from '../api/client';
@@ -91,6 +91,8 @@ const KnowledgeBase: React.FC = () => {
   const [transcriptionShowCount, setTranscriptionShowCount] = useState<{[key: string]: number}>({});
   const [loadingScoring, setLoadingScoring] = useState<{[key: string]: boolean}>({});
   const [callDurations, setCallDurations] = useState<{ [id: string]: number }>({});
+  const [translatedAnalysis, setTranslatedAnalysis] = useState<{[key: string]: DocumentAnalysis}>({});
+  const [translatingDocument, setTranslatingDocument] = useState<string | null>(null);
   const TRANSCRIPTION_PAGE_SIZE = 5;
   
   // Load items from localStorage on mount
@@ -789,6 +791,64 @@ const KnowledgeBase: React.FC = () => {
     });
   };
 
+  // Function to detect if text is likely in English
+  const isTextInEnglish = (text: string): boolean => {
+    if (!text) return true;
+    
+    // Simple heuristic: check for common English words and patterns
+    const englishWords = ['the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by'];
+    const words = text.toLowerCase().split(/\s+/);
+    const englishWordCount = words.filter(word => englishWords.includes(word)).length;
+    const englishRatio = englishWordCount / Math.min(words.length, 20); // Check first 20 words
+    
+    return englishRatio > 0.2; // If more than 20% are common English words
+  };
+
+  // Function to check if analysis needs translation
+  const needsTranslation = (analysis: DocumentAnalysis): boolean => {
+    const textSample = `${analysis.summary} ${analysis.domain} ${analysis.theme}`.substring(0, 200);
+    return !isTextInEnglish(textSample);
+  };
+
+  // Function to translate document analysis to English
+  const translateAnalysis = async (documentId: string, analysis: DocumentAnalysis) => {
+    try {
+      setTranslatingDocument(documentId);
+
+      // Create a comprehensive text for translation
+      const textToTranslate = {
+        summary: analysis.summary,
+        domain: analysis.domain,
+        theme: analysis.theme,
+        technicalLevel: analysis.technicalLevel,
+        mainPoints: analysis.mainPoints,
+        targetAudience: analysis.targetAudience,
+        keyTerms: analysis.keyTerms,
+        recommendations: analysis.recommendations
+      };
+
+      // Call backend translation service
+      const response = await apiClient.post('/rag/translate-analysis', {
+        analysis: textToTranslate,
+        targetLanguage: 'English'
+      });
+
+      console.log('Translation response:', response.data);
+      
+      // Store translated analysis
+      setTranslatedAnalysis(prev => ({
+        ...prev,
+        [documentId]: response.data.translatedAnalysis
+      }));
+
+    } catch (error) {
+      console.error('Error translating analysis:', error);
+      alert('Failed to translate analysis. Please try again.');
+    } finally {
+      setTranslatingDocument(null);
+    }
+  };
+
   // Create unified items list combining documents and call recordings
   const getUnifiedItems = () => {
     // Convert documents to unified format
@@ -1388,58 +1448,109 @@ const KnowledgeBase: React.FC = () => {
     );
   };
 
-  const renderAnalysisContent = (analysis: AnalysisResult) => {
+  const renderAnalysisContent = (analysis: AnalysisResult, documentId?: string) => {
     if ('domain' in analysis) {
       // This is a DocumentAnalysis
       const documentAnalysis = analysis as DocumentAnalysis;
+      const hasTranslation = documentId && translatedAnalysis[documentId];
+      const displayAnalysis = hasTranslation ? translatedAnalysis[documentId] : documentAnalysis;
+      const showTranslateButton = documentId && needsTranslation(documentAnalysis) && !hasTranslation;
+      
       return (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div className="space-y-6">
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Summary</h3>
-              <p className="text-gray-700">{documentAnalysis.summary}</p>
+        <div>
+          {/* Translation status and button */}
+          {documentId && (
+            <div className="mb-6 flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                {hasTranslation && (
+                  <div className="flex items-center text-sm text-green-600 bg-green-50 px-3 py-1 rounded-full">
+                    <Languages size={14} className="mr-1" />
+                    Translated to English
+                  </div>
+                )}
+                {showTranslateButton && (
+                  <button
+                    onClick={() => translateAnalysis(documentId, documentAnalysis)}
+                    disabled={translatingDocument === documentId}
+                    className="flex items-center text-sm px-3 py-1 bg-blue-100 text-blue-700 rounded-full hover:bg-blue-200 disabled:opacity-50"
+                  >
+                    {translatingDocument === documentId ? (
+                      <>
+                        <Loader2 size={14} className="mr-1 animate-spin" />
+                        Translating...
+                      </>
+                    ) : (
+                      <>
+                        <Languages size={14} className="mr-1" />
+                        Translate to English
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+              {hasTranslation && (
+                <button
+                  onClick={() => setTranslatedAnalysis(prev => {
+                    const newState = { ...prev };
+                    delete newState[documentId];
+                    return newState;
+                  })}
+                  className="text-sm text-gray-500 hover:text-gray-700"
+                >
+                  Show Original
+                </button>
+              )}
             </div>
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Domain</h3>
-              <p className="text-gray-700">{documentAnalysis.domain}</p>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Summary</h3>
+                <p className="text-gray-700">{displayAnalysis.summary}</p>
+              </div>
+              <div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Domain</h3>
+                <p className="text-gray-700">{displayAnalysis.domain}</p>
+              </div>
+              <div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Theme</h3>
+                <p className="text-gray-700">{displayAnalysis.theme}</p>
+              </div>
+              <div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Technical Level</h3>
+                <p className="text-gray-700">{displayAnalysis.technicalLevel}</p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Theme</h3>
-              <p className="text-gray-700">{documentAnalysis.theme}</p>
-            </div>
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Technical Level</h3>
-              <p className="text-gray-700">{documentAnalysis.technicalLevel}</p>
-            </div>
-          </div>
-          <div className="space-y-6">
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Main Points</h3>
-              <ul className="list-disc list-inside space-y-2">
-                {documentAnalysis.mainPoints.map((point: string, index: number) => (
-                  <li key={index} className="text-gray-700">{point}</li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Target Audience</h3>
-              <p className="text-gray-700">{documentAnalysis.targetAudience}</p>
-            </div>
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Key Terms</h3>
-              <ul className="list-disc list-inside space-y-2">
-                {documentAnalysis.keyTerms.map((term: string, index: number) => (
-                  <li key={index} className="text-gray-700">{term}</li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Recommendations</h3>
-              <ul className="list-disc list-inside space-y-2">
-                {documentAnalysis.recommendations.map((rec: string, index: number) => (
-                  <li key={index} className="text-gray-700">{rec}</li>
-                ))}
-              </ul>
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Main Points</h3>
+                <ul className="list-disc list-inside space-y-2">
+                  {displayAnalysis.mainPoints.map((point: string, index: number) => (
+                    <li key={index} className="text-gray-700">{point}</li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Target Audience</h3>
+                <p className="text-gray-700">{displayAnalysis.targetAudience}</p>
+              </div>
+              <div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Key Terms</h3>
+                <ul className="list-disc list-inside space-y-2">
+                  {displayAnalysis.keyTerms.map((term: string, index: number) => (
+                    <li key={index} className="text-gray-700">{term}</li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Recommendations</h3>
+                <ul className="list-disc list-inside space-y-2">
+                  {displayAnalysis.recommendations.map((rec: string, index: number) => (
+                    <li key={index} className="text-gray-700">{rec}</li>
+                  ))}
+                </ul>
+              </div>
             </div>
           </div>
         </div>
@@ -1553,7 +1664,7 @@ const KnowledgeBase: React.FC = () => {
 
           {/* Contenu de l'analyse */}
           {documentAnalysis[selectedDocumentForAnalysis.id] ? (
-            renderAnalysisContent(documentAnalysis[selectedDocumentForAnalysis.id])
+            renderAnalysisContent(documentAnalysis[selectedDocumentForAnalysis.id], selectedDocumentForAnalysis.id)
           ) : (
             <div className="text-center py-12">
               <Brain size={48} className="mx-auto text-gray-400 mb-4" />
