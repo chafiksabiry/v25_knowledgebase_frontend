@@ -6,7 +6,7 @@ import apiClient from '../api/client';
 import Cookies from 'js-cookie';
 import axios from 'axios';
 
-type TabType = 'documents' | 'calls';
+
 
 interface DocumentAnalysis {
   summary: string;
@@ -59,7 +59,7 @@ const KnowledgeBase: React.FC = () => {
   const [uploadDescription, setUploadDescription] = useState('');
   const [uploadUrl, setUploadUrl] = useState('');
   const [uploadFile, setUploadFile] = useState<File | null>(null);
-  const [activeTab, setActiveTab] = useState<TabType>('documents');
+
   const [uploadTags, setUploadTags] = useState<string>('');
   const [knowledgeItems, setKnowledgeItems] = useState<KnowledgeItem[]>([]);
   const [callRecords, setCallRecords] = useState<CallRecord[]>([]);
@@ -320,7 +320,7 @@ const KnowledgeBase: React.FC = () => {
     fetchCallRecords();
   }, []);
 
-  // Handle form submission
+  // Unified form submission handler
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsUploading(true);
@@ -335,30 +335,76 @@ const KnowledgeBase: React.FC = () => {
         throw new Error('User ID not found');
       }
 
-      const formData = new FormData();
-      formData.append('file', uploadFile);
-      formData.append('name', uploadName);
-      formData.append('description', uploadDescription);
-      formData.append('tags', uploadTags);
-      formData.append('uploadedBy', 'Current User');
-      formData.append('userId', userId);
+      if (uploadType === 'document') {
+        // Handle document upload
+        const formData = new FormData();
+        formData.append('file', uploadFile);
+        formData.append('name', uploadName);
+        formData.append('description', uploadDescription);
+        formData.append('tags', uploadTags);
+        formData.append('uploadedBy', 'Current User');
+        formData.append('userId', userId);
 
-      // Upload the document
-      const response = await apiClient.post('/documents/upload', formData);
-      console.log('Document upload successful:', response.data);
+        const response = await apiClient.post('/documents/upload', formData);
+        console.log('Document upload successful:', response.data);
 
-      // Fetch latest documents to check if this was the first upload
-      const hasMultipleDocuments = await fetchAndUpdateDocuments();
-      
-      // If we don't have multiple documents yet, this is the first upload
-      if (!hasMultipleDocuments) {
-        console.log('Updating onboarding progress for first upload');
-        try {
-          await updateOnboardingProgress();
-          console.log('Successfully updated onboarding progress');
-        } catch (error) {
-          console.error('Failed to update onboarding progress:', error);
+        // Fetch latest documents to check if this was the first upload
+        const hasMultipleDocuments = await fetchAndUpdateDocuments();
+        
+        // If we don't have multiple documents yet, this is the first upload
+        if (!hasMultipleDocuments) {
+          console.log('Updating onboarding progress for first upload');
+          try {
+            await updateOnboardingProgress();
+            console.log('Successfully updated onboarding progress');
+          } catch (error) {
+            console.error('Failed to update onboarding progress:', error);
+          }
         }
+      } else if (uploadType === 'audio') {
+        // Handle call recording upload
+        const duration = await getAudioDuration(uploadFile);
+        
+        const formData = new FormData();
+        formData.append('file', uploadFile);
+        formData.append('contactId', uploadName);
+        formData.append('date', format(new Date(), 'yyyy-MM-dd'));
+        formData.append('duration', duration.toString());
+        formData.append('summary', uploadDescription);
+        formData.append('sentiment', 'neutral');
+        formData.append('tags', uploadTags);
+        formData.append('aiInsights', '');
+        formData.append('repId', 'current-user');
+        formData.append('userId', userId);
+
+        const response = await apiClient.post('/call-recordings/upload', formData);
+        console.log('Call recording upload successful:', response.data);
+
+        const newCall: CallRecord = {
+          id: response.data.callRecording.id,
+          contactId: response.data.callRecording.contactId,
+          date: response.data.callRecording.date,
+          duration: response.data.callRecording.duration,
+          recordingUrl: response.data.callRecording.recordingUrl,
+          transcriptUrl: '',
+          summary: response.data.callRecording.summary,
+          sentiment: response.data.callRecording.sentiment,
+          tags: response.data.callRecording.tags,
+          aiInsights: response.data.callRecording.aiInsights,
+          repId: response.data.callRecording.repId,
+          companyId: response.data.callRecording.companyId,
+          processingOptions: { transcription: true, sentiment: true, insights: true },
+          audioState: {
+            isPlaying: false,
+            currentTime: 0,
+            duration: duration || 0,
+            audioInstance: null,
+            showPlayer: false,
+            showTranscript: false
+          }
+        };
+        
+        setCallRecords(prevCalls => [...prevCalls, newCall]);
       }
 
       // Reset form and close modal
@@ -379,20 +425,21 @@ const KnowledgeBase: React.FC = () => {
   // Handle item deletion with improved cleanup
   const handleDelete = async (id: string) => {
     console.log('Attempting to delete item with ID:', id);
-    console.log('Active tab:', activeTab);
     
     try {
-      if (activeTab === 'documents') {
-        // Log the item being deleted
-        const itemToDelete = knowledgeItems.find(item => item.id === id);
-        console.log('Document being deleted:', itemToDelete);
+      // Check if it's a document or call recording
+      const document = knowledgeItems.find(item => item.id === id);
+      const callRecording = callRecords.find(call => call.id === id);
+      
+      if (document) {
+        // Log the document being deleted
+        console.log('Document being deleted:', document);
         
         await apiClient.delete(`/documents/${id}`);
         setKnowledgeItems(prevItems => prevItems.filter(item => item.id !== id));
-      } else {
+      } else if (callRecording) {
         // Log the call being deleted
-        const callToDelete = callRecords.find(call => call.id === id);
-        console.log('Call recording being deleted:', callToDelete);
+        console.log('Call recording being deleted:', callRecording);
         
         // Delete call recording from the backend
         await apiClient.delete(`/call-recordings/${id}`);
@@ -456,16 +503,10 @@ const KnowledgeBase: React.FC = () => {
     }
   };
 
-  // Refactor handleView to fetch summary, transcription, and scoring separately
+  // Unified handleView for both documents and call recordings
   const handleView = async (item: any) => {
-    if (activeTab === 'documents') {
-      setSelectedDocumentForAnalysis(item);
-      setShowAnalysisPage(true);
-      if (!documentAnalysis[item.id]) {
-        await analyzeDocument(item.id);
-      }
-    } else {
-      // Pour les call recordings, on peut ouvrir la modale de détails
+    if (item.isCallRecording || item.recordingUrl) {
+      // Handle call recording view
       setSelectedItem(item);
       setIsModalOpen(true);
       // Fetch summary
@@ -541,6 +582,13 @@ const KnowledgeBase: React.FC = () => {
           setLoadingScoring(prev => ({ ...prev, [item.id]: false }));
         }
       }
+    } else {
+      // Handle document view
+      setSelectedDocumentForAnalysis(item);
+      setShowAnalysisPage(true);
+      if (!documentAnalysis[item.id]) {
+        await analyzeDocument(item.id);
+      }
     }
   };
 
@@ -592,79 +640,7 @@ const KnowledgeBase: React.FC = () => {
     setSelectedItem(null);
   };
 
-  // Handle call recording submission
-  const handleCallSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsUploading(true);
-    
-    try {
-      if (!uploadFile) {
-        throw new Error('No file selected');
-      }
 
-      const userId = getUserId();
-      if (!userId) {
-        throw new Error('User ID not found');
-      }
-
-      const audioUrl = await createFileUrl(uploadFile);
-      const duration = await getAudioDuration(uploadFile);
-      
-      const formData = new FormData();
-      formData.append('file', uploadFile);
-      formData.append('contactId', uploadName);
-      formData.append('date', format(new Date(), 'yyyy-MM-dd'));
-      formData.append('duration', duration.toString());
-      formData.append('summary', uploadDescription);
-      formData.append('sentiment', 'neutral');
-      formData.append('tags', uploadTags);
-      formData.append('aiInsights', '');
-      formData.append('repId', 'current-user');
-      formData.append('userId', userId);
-
-      const response = await apiClient.post('/call-recordings/upload', formData);
-
-      console.log('Upload result:', response.data);
-
-      const newCall: CallRecord = {
-        id: response.data.callRecording.id,
-        contactId: response.data.callRecording.contactId,
-        date: response.data.callRecording.date,
-        duration: response.data.callRecording.duration,
-        recordingUrl: response.data.callRecording.recordingUrl,
-        transcriptUrl: '',
-        summary: response.data.callRecording.summary,
-        sentiment: response.data.callRecording.sentiment,
-        tags: response.data.callRecording.tags,
-        aiInsights: response.data.callRecording.aiInsights,
-        repId: response.data.callRecording.repId,
-        companyId: response.data.callRecording.companyId,
-        processingOptions: { transcription: true, sentiment: true, insights: true },
-        audioState: {
-          isPlaying: false,
-          currentTime: 0,
-          duration: duration || 0,
-          audioInstance: null,
-          showPlayer: false,
-          showTranscript: false
-        }
-      };
-      
-      setCallRecords(prevCalls => [...prevCalls, newCall]);
-      
-      // Reset form
-      setUploadName('');
-      setUploadDescription('');
-      setUploadFile(null);
-      setUploadTags('');
-      setShowUploadModal(false);
-    } catch (error) {
-      console.error('Error uploading call recording:', error);
-      alert('There was an error uploading your call recording. Please try again.');
-    } finally {
-      setIsUploading(false);
-    }
-  };
 
   // Handle audio playback
   const handlePlayRecording = (recordingUrl: string, callId: string) => {
@@ -759,13 +735,7 @@ const KnowledgeBase: React.FC = () => {
     }
   };
 
-  // Stop audio playback when switching tabs
-  useEffect(() => {
-    if (activeTab !== 'calls' && currentAudio) {
-      currentAudio.pause();
-      setIsPlaying(false);
-    }
-  }, [activeTab]);
+
 
   // Clean up audio on unmount
   useEffect(() => {
@@ -817,9 +787,7 @@ const KnowledgeBase: React.FC = () => {
     }
   };
 
-  // Add type guard for tab comparison
-  const isDocumentsTab = (tab: TabType): tab is 'documents' => tab === 'documents';
-  const isCallsTab = (tab: TabType): tab is 'calls' => tab === 'calls';
+
 
   // Fonction utilitaire pour charger la durée d'un audio à partir de son URL
   const fetchAudioDuration = (recordingUrl: string, callId: string) => {
@@ -830,92 +798,53 @@ const KnowledgeBase: React.FC = () => {
     });
   };
 
-  const renderContent = () => {
-    if (isDocumentsTab(activeTab)) {
-      return filteredItems.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredItems.map((item) => (
-            <div key={item.id} className="bg-white p-5 rounded-lg shadow-sm border border-gray-100">
-              <div className="flex items-start">
-                <div className="p-3 rounded-lg bg-gray-100 mr-4 flex-shrink-0">
-                  {getItemIcon(item.type)}
-                </div>
-                
-                <div className="flex-grow min-w-0">
-                  <h3 className="text-lg font-medium text-gray-900 mb-1 truncate">{item.name}</h3>
-                  <p className="text-sm text-gray-500 mb-3 break-words line-clamp-2">{item.description}</p>
-                  
-                  <div className="flex flex-wrap gap-1 mb-3">
-                    {item.tags.map((tag: string, index: number) => (
-                      <span 
-                        key={`${item.id}-${tag}`}
-                        className="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-700 whitespace-nowrap"
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <span className={`px-2 py-1 text-xs rounded-full whitespace-nowrap ${
-                      item.type === 'document' ? 'bg-blue-100 text-blue-800' : 
-                      item.type === 'audio' ? 'bg-purple-100 text-purple-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {item.type.charAt(0).toUpperCase() + item.type.slice(1)}
-                    </span>
-                    
-                    <div className="flex space-x-2 flex-shrink-0">
-                      <button 
-                        onClick={() => handleView(item)}
-                        className="text-blue-600 hover:text-blue-800 p-1"
-                        title="View details"
-                      >
-                        <Eye size={16} />
-                      </button>
-                      <button 
-                        className="text-red-600 hover:text-red-800 p-1"
-                        onClick={() => handleDelete(item.id)}
-                        title="Delete"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="bg-white p-8 rounded-lg shadow-sm border border-gray-100 text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 mb-4">
-            <File size={24} className="text-gray-400" />
-          </div>
-          <h3 className="text-lg font-medium text-gray-900 mb-1">No resources found</h3>
-          <p className="text-gray-500 max-w-md mx-auto">
-            {searchTerm || typeFilter !== 'all'
-              ? "No resources match your current search or filter. Try adjusting your criteria."
-              : "Your knowledge base is empty. Add documents, videos, or links to get started."}
-          </p>
-          {!searchTerm && typeFilter === 'all' && (
-            <button 
-              className="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center mx-auto"
-              onClick={() => setShowUploadModal(true)}
-            >
-              <Plus size={18} className="mr-2" />
-              Add Your First Resource
-            </button>
-          )}
-        </div>
-      );
-    }
+  // Create unified items list combining documents and call recordings
+  const getUnifiedItems = () => {
+    // Convert documents to unified format
+    const documentItems = filteredItems.map(item => ({
+      ...item,
+      itemType: 'document' as const,
+      date: item.uploadedAt,
+      isCallRecording: false
+    }));
 
-    return (
-      <div className="space-y-4">
-        {callRecords.length > 0 ? (
-          <>
-            {callRecords.map((call) => {
+    // Convert call recordings to unified format  
+    const callItems = callRecords
+      .filter(call => {
+        const matchesSearch = 
+          call.contactId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          call.summary.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          call.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
+        const matchesType = typeFilter === 'all' || typeFilter === 'audio';
+        return matchesSearch && matchesType;
+      })
+      .map(call => ({
+        id: call.id,
+        name: call.contactId,
+        description: call.summary,
+        type: 'audio' as const,
+        itemType: 'callRecording' as const,
+        tags: call.tags,
+        date: call.date,
+        isCallRecording: true,
+        callData: call
+      }));
+
+    // Combine and sort by date (most recent first)
+    return [...documentItems, ...callItems].sort((a, b) => 
+      new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
+  };
+
+  const renderContent = () => {
+    const unifiedItems = getUnifiedItems();
+    
+    if (unifiedItems.length > 0) {
+      return (
+        <div className="space-y-4">
+                     {unifiedItems.map((item) => {
+             if (item.isCallRecording && 'callData' in item && item.callData) {
+               const call = item.callData;
               // Charger la durée si pas déjà chargée
               fetchAudioDuration(call.recordingUrl, call.id);
               return (
@@ -928,6 +857,9 @@ const KnowledgeBase: React.FC = () => {
                       <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
                         <h3 className="text-lg font-medium text-gray-900 truncate">{call.contactId}</h3>
                         <div className="flex items-center space-x-2 flex-shrink-0">
+                          <span className="px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-800">
+                            Call Recording
+                          </span>
                           {call.processingOptions?.sentiment && call.sentiment && (
                             <span className={`px-2 py-1 text-xs rounded-full whitespace-nowrap ${
                               call.sentiment === 'positive' ? 'bg-green-100 text-green-800' : 
@@ -955,7 +887,6 @@ const KnowledgeBase: React.FC = () => {
                       </div>
                       <div className="flex items-center text-sm text-gray-500 mb-3 whitespace-nowrap">
                         <Clock size={14} className="mr-1 flex-shrink-0" />
-                        {/* Date formatée et durée dynamique mm:ss */}
                         {formatDate(call.date)} • {callDurations[call.id] !== undefined ? formatTime(callDurations[call.id]) : '...'}
                       </div>
                       <p className="text-sm text-gray-700 mb-3 break-words overflow-hidden">{call.summary}</p>
@@ -973,218 +904,274 @@ const KnowledgeBase: React.FC = () => {
                   </div>
                 </div>
               );
-            })}
-            {/* Panneau de détails sous la liste */}
-            {selectedItem && (
-              <div className="bg-white rounded-lg shadow-lg border border-blue-200 mt-6 p-6 w-full">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="flex items-center">
-                    <Mic size={20} className="text-purple-500" />
-                    <h3 className="text-xl font-semibold ml-2">Call Recording Details</h3>
-                  </div>
-                  <button
-                    onClick={handleDetailsModalClose}
-                    className="text-gray-400 hover:text-gray-500"
-                  >
-                    <X size={24} />
-                  </button>
-                </div>
-                <div className="border-b border-gray-200 pb-6 mb-6">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h2 className="text-2xl font-semibold text-gray-900 mb-2">{selectedItem.contactId}</h2>
-                      <p className="text-gray-600 mb-2">{selectedItem.summary}</p>
-                      <div className="flex items-center text-gray-500 mb-2">
-                        <Clock size={16} className="mr-2" />
-                        {formatDate(selectedItem.date)} • {callDurations[selectedItem.id] !== undefined ? formatTime(callDurations[selectedItem.id]) : '...'}
+            } else {
+              // Document item
+              return (
+                <div key={item.id} className="bg-white p-5 rounded-lg shadow-sm border border-gray-100">
+                  <div className="flex items-start">
+                    <div className="p-3 rounded-lg bg-gray-100 mr-4 flex-shrink-0">
+                      {getItemIcon(item.type)}
+                    </div>
+                    <div className="flex-grow min-w-0">
+                      <h3 className="text-lg font-medium text-gray-900 mb-1 truncate">{item.name}</h3>
+                      <p className="text-sm text-gray-500 mb-3 break-words line-clamp-2">{item.description}</p>
+                      
+                      <div className="flex flex-wrap gap-1 mb-3">
+                        {item.tags.map((tag: string, index: number) => (
+                          <span 
+                            key={`${item.id}-${tag}`}
+                            className="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-700 whitespace-nowrap"
+                          >
+                            {tag}
+                          </span>
+                        ))}
                       </div>
-                      {selectedItem.tags && selectedItem.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mb-2">
-                          {selectedItem.tags.map((tag: string, index: number) => (
-                            <span
-                              key={index}
-                              className="px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-sm"
-                            >
-                              {tag}
-                            </span>
-                          ))}
+                      
+                      <div className="flex items-center justify-between">
+                        <span className={`px-2 py-1 text-xs rounded-full whitespace-nowrap ${
+                          item.type === 'document' ? 'bg-blue-100 text-blue-800' : 
+                          item.type === 'audio' ? 'bg-purple-100 text-purple-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {item.type.charAt(0).toUpperCase() + item.type.slice(1)}
+                        </span>
+                        
+                        <div className="flex space-x-2 flex-shrink-0">
+                          <button 
+                            onClick={() => handleView(item)}
+                            className="text-blue-600 hover:text-blue-800 p-1"
+                            title="View details"
+                          >
+                            <Eye size={16} />
+                          </button>
+                          <button 
+                            className="text-red-600 hover:text-red-800 p-1"
+                            onClick={() => handleDelete(item.id)}
+                            title="Delete"
+                          >
+                            <Trash2 size={16} />
+                          </button>
                         </div>
-                      )}
-                    </div>
-                    <div className="flex flex-col items-end gap-2">
-                      <button
-                        className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                        onClick={() => handlePlayRecording(selectedItem.recordingUrl, selectedItem.id)}
-                        title={playingCallId === selectedItem.id && isPlaying ? "Pause" : "Play"}
-                      >
-                        {playingCallId === selectedItem.id && isPlaying ? <Pause size={18} /> : <Play size={18} />}
-                        <span className="ml-2">{playingCallId === selectedItem.id && isPlaying ? 'Pause' : 'Play'} Audio</span>
-                      </button>
-                      <span className="text-xs text-gray-500">
-                        {playingCallId === selectedItem.id ? `${formatTime(currentTime)} / ${formatTime(duration)}` : '0:00 / 0:00'}
-                      </span>
+                      </div>
                     </div>
                   </div>
                 </div>
-                {/* Call Analysis Section */}
-                <div className="mt-6 w-full">
-                  <h2 className="text-2xl font-bold text-gray-800 mb-6">Call Analysis</h2>
-                  {/* Key Points Section */}
-                  <details className="mb-4" open>
-                    <summary className="cursor-pointer text-gray-700 font-semibold py-2">Key Points</summary>
-                    <div className="space-y-4 p-2">
-                      {loadingSummary[selectedItem.id] ? (
-                        <div className="flex items-center space-x-2 text-blue-600">
-                          <Loader2 className="animate-spin" size={20} />
-                          <span>Analyzing call, please wait...</span>
-                        </div>
-                      ) : documentAnalysis[selectedItem.id] && 'summary' in documentAnalysis[selectedItem.id] && (documentAnalysis[selectedItem.id] as CallAnalysis).summary?.keyIdeas?.length > 0 ? (
-                        <>
-                          {(documentAnalysis[selectedItem.id] as CallAnalysis).summary.keyIdeas.map((idea, idx) => (
-                            <div key={idx} className="bg-gray-50 p-4 rounded-lg">
-                              <h5 className="font-medium text-gray-900 mb-2">{idea.title}</h5>
-                              <p className="text-gray-700">{idea.description}</p>
-                            </div>
-                          ))}
-                          <div className="mt-4 text-sm text-gray-500">
-                            Last updated: {format(new Date((documentAnalysis[selectedItem.id] as CallAnalysis).summary.lastUpdated), 'PPpp')}
-                          </div>
-                        </>
-                      ) : (
-                        <div className="text-gray-500 italic">No analysis available yet.</div>
-                      )}
+              );
+            }
+          })}
+          
+          {/* Panneau de détails pour call recordings */}
+          {selectedItem && selectedItem.recordingUrl && (
+            <div className="bg-white rounded-lg shadow-lg border border-blue-200 mt-6 p-6 w-full">
+              <div className="flex justify-between items-start mb-4">
+                <div className="flex items-center">
+                  <Mic size={20} className="text-purple-500" />
+                  <h3 className="text-xl font-semibold ml-2">Call Recording Details</h3>
+                </div>
+                <button
+                  onClick={handleDetailsModalClose}
+                  className="text-gray-400 hover:text-gray-500"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+              <div className="border-b border-gray-200 pb-6 mb-6">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h2 className="text-2xl font-semibold text-gray-900 mb-2">{selectedItem.contactId}</h2>
+                    <p className="text-gray-600 mb-2">{selectedItem.summary}</p>
+                    <div className="flex items-center text-gray-500 mb-2">
+                      <Clock size={16} className="mr-2" />
+                      {formatDate(selectedItem.date)} • {callDurations[selectedItem.id] !== undefined ? formatTime(callDurations[selectedItem.id]) : '...'}
                     </div>
-                  </details>
-                  {/* Transcription Section */}
-                  <details className="mb-4" open>
-                    <summary className="cursor-pointer text-gray-700 font-semibold py-2">Transcription</summary>
-                    <div className="p-4">
-                      {loadingTranscription[selectedItem.id] ? (
-                        <div className="flex items-center space-x-2 text-blue-600">
-                          <Loader2 className="animate-spin" size={20} />
-                          <span>Generating transcription, please wait...</span>
-                        </div>
-                      ) : (() => {
-                        if (!documentAnalysis || !selectedItem?.id) {
-                          return <div className="text-gray-500 italic">No transcription available yet.</div>;
-                        }
-                        const analysis = documentAnalysis[selectedItem.id];
-                        if (!analysis || !('transcription' in analysis)) {
-                          return <div className="text-gray-500 italic">No transcription available yet.</div>;
-                        }
-                        const callAnalysis = analysis as CallAnalysis;
-                        if (callAnalysis.transcription?.status !== 'completed' || !callAnalysis.transcription?.segments?.length) {
-                          return <div className="text-gray-500 italic">No transcription available yet.</div>;
-                        }
-                        const showCount = transcriptionShowCount[selectedItem.id] || TRANSCRIPTION_PAGE_SIZE;
-                        const segmentsToShow = callAnalysis.transcription.segments.slice(0, showCount);
-                        return (
-                          <div className="space-y-4">
-                            {segmentsToShow.map((segment: any, idx: number) => (
-                              <div key={idx} className="bg-gray-50 p-4 rounded-lg">
-                                <div className="flex justify-between items-center mb-2 text-sm text-gray-500">
-                                  <span>{typeof segment.start === 'string' ? segment.start : formatTime(segment.start)} - {typeof segment.end === 'string' ? segment.end : formatTime(segment.end)}</span>
-                                  {segment.speaker && <span className="font-medium">{segment.speaker}</span>}
-                                </div>
-                                <p className="text-gray-700">{segment.text}</p>
-                              </div>
-                            ))}
-                            {showCount < callAnalysis.transcription.segments.length && (
-                              <button
-                                className="mt-2 px-4 py-2 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
-                                onClick={() => setTranscriptionShowCount(prev => ({ ...prev, [selectedItem.id]: showCount + TRANSCRIPTION_PAGE_SIZE }))}
-                              >
-                                Show more
-                              </button>
-                            )}
-                            {showCount > TRANSCRIPTION_PAGE_SIZE && (
-                              <button
-                                className="mt-2 ml-2 px-4 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
-                                onClick={() => setTranscriptionShowCount(prev => ({ ...prev, [selectedItem.id]: TRANSCRIPTION_PAGE_SIZE }))}
-                              >
-                                Show less
-                              </button>
-                            )}
-                            {callAnalysis.transcription.lastUpdated && (
-                              <div className="mt-4 text-sm text-gray-500">
-                                Last updated: {format(new Date(callAnalysis.transcription.lastUpdated), 'PPpp')}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  </details>
-                  {/* Scoring Section */}
-                  <details className="mb-4" open>
-                    <summary className="cursor-pointer text-gray-700 font-semibold py-2">Scoring</summary>
-                    <div className="p-4">
-                      {loadingScoring[selectedItem.id] ? (
-                        <div className="flex items-center space-x-2 text-blue-600">
-                          <Loader2 className="animate-spin" size={20} />
-                          <span>Generating scoring, please wait...</span>
-                        </div>
-                      ) : (() => {
-                        if (!documentAnalysis || !selectedItem?.id) {
-                          return <div className="text-gray-500 italic">No scoring available yet.</div>;
-                        }
-                        const analysis = documentAnalysis[selectedItem.id];
-                        if (!analysis || !('scoring' in analysis)) {
-                          return <div className="text-gray-500 italic">No scoring available yet.</div>;
-                        }
-                        const scoring = (analysis as any).scoring;
-                        if (scoring?.status !== 'completed' || !scoring?.result) {
-                          return <div className="text-gray-500 italic">No scoring available yet.</div>;
-                        }
-                        return (
-                          <div className="space-y-4">
-                            {Object.entries(scoring.result).map(([section, value]: [string, any]) => (
-                              <div key={section} className="bg-gray-50 p-4 rounded-lg">
-                                <div className="flex justify-between items-center mb-2 text-sm text-gray-500">
-                                  <span className="font-medium">{section}</span>
-                                  <span>Score: {value.score}</span>
-                                </div>
-                                <p className="text-gray-700">{value.feedback}</p>
-                              </div>
-                            ))}
-                            {scoring.lastUpdated && (
-                              <div className="mt-4 text-sm text-gray-500">
-                                Last updated: {format(new Date(scoring.lastUpdated), 'PPpp')}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  </details>
+                    {selectedItem.tags && selectedItem.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        {selectedItem.tags.map((tag: string, index: number) => (
+                          <span
+                            key={index}
+                            className="px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-sm"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex flex-col items-end gap-2">
+                    <button
+                      className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                      onClick={() => handlePlayRecording(selectedItem.recordingUrl, selectedItem.id)}
+                      title={playingCallId === selectedItem.id && isPlaying ? "Pause" : "Play"}
+                    >
+                      {playingCallId === selectedItem.id && isPlaying ? <Pause size={18} /> : <Play size={18} />}
+                      <span className="ml-2">{playingCallId === selectedItem.id && isPlaying ? 'Pause' : 'Play'} Audio</span>
+                    </button>
+                    <span className="text-xs text-gray-500">
+                      {playingCallId === selectedItem.id ? `${formatTime(currentTime)} / ${formatTime(duration)}` : '0:00 / 0:00'}
+                    </span>
+                  </div>
                 </div>
               </div>
-            )}
-          </>
-        ) : (
-          <div className="bg-white p-8 rounded-lg shadow-sm border border-gray-100 text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 mb-4">
-              <Mic size={24} className="text-gray-400" />
+              {/* Call Analysis Section */}
+              <div className="mt-6 w-full">
+                <h2 className="text-2xl font-bold text-gray-800 mb-6">Call Analysis</h2>
+                {/* Key Points Section */}
+                <details className="mb-4" open>
+                  <summary className="cursor-pointer text-gray-700 font-semibold py-2">Key Points</summary>
+                  <div className="space-y-4 p-2">
+                    {loadingSummary[selectedItem.id] ? (
+                      <div className="flex items-center space-x-2 text-blue-600">
+                        <Loader2 className="animate-spin" size={20} />
+                        <span>Analyzing call, please wait...</span>
+                      </div>
+                    ) : documentAnalysis[selectedItem.id] && 'summary' in documentAnalysis[selectedItem.id] && (documentAnalysis[selectedItem.id] as CallAnalysis).summary?.keyIdeas?.length > 0 ? (
+                      <>
+                        {(documentAnalysis[selectedItem.id] as CallAnalysis).summary.keyIdeas.map((idea, idx) => (
+                          <div key={idx} className="bg-gray-50 p-4 rounded-lg">
+                            <h5 className="font-medium text-gray-900 mb-2">{idea.title}</h5>
+                            <p className="text-gray-700">{idea.description}</p>
+                          </div>
+                        ))}
+                        <div className="mt-4 text-sm text-gray-500">
+                          Last updated: {format(new Date((documentAnalysis[selectedItem.id] as CallAnalysis).summary.lastUpdated), 'PPpp')}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-gray-500 italic">No analysis available yet.</div>
+                    )}
+                  </div>
+                </details>
+                {/* Transcription Section */}
+                <details className="mb-4" open>
+                  <summary className="cursor-pointer text-gray-700 font-semibold py-2">Transcription</summary>
+                  <div className="p-4">
+                    {loadingTranscription[selectedItem.id] ? (
+                      <div className="flex items-center space-x-2 text-blue-600">
+                        <Loader2 className="animate-spin" size={20} />
+                        <span>Generating transcription, please wait...</span>
+                      </div>
+                    ) : (() => {
+                      if (!documentAnalysis || !selectedItem?.id) {
+                        return <div className="text-gray-500 italic">No transcription available yet.</div>;
+                      }
+                      const analysis = documentAnalysis[selectedItem.id];
+                      if (!analysis || !('transcription' in analysis)) {
+                        return <div className="text-gray-500 italic">No transcription available yet.</div>;
+                      }
+                      const callAnalysis = analysis as CallAnalysis;
+                      if (callAnalysis.transcription?.status !== 'completed' || !callAnalysis.transcription?.segments?.length) {
+                        return <div className="text-gray-500 italic">No transcription available yet.</div>;
+                      }
+                      const showCount = transcriptionShowCount[selectedItem.id] || TRANSCRIPTION_PAGE_SIZE;
+                      const segmentsToShow = callAnalysis.transcription.segments.slice(0, showCount);
+                      return (
+                        <div className="space-y-4">
+                          {segmentsToShow.map((segment: any, idx: number) => (
+                            <div key={idx} className="bg-gray-50 p-4 rounded-lg">
+                              <div className="flex justify-between items-center mb-2 text-sm text-gray-500">
+                                <span>{typeof segment.start === 'string' ? segment.start : formatTime(segment.start)} - {typeof segment.end === 'string' ? segment.end : formatTime(segment.end)}</span>
+                                {segment.speaker && <span className="font-medium">{segment.speaker}</span>}
+                              </div>
+                              <p className="text-gray-700">{segment.text}</p>
+                            </div>
+                          ))}
+                          {showCount < callAnalysis.transcription.segments.length && (
+                            <button
+                              className="mt-2 px-4 py-2 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                              onClick={() => setTranscriptionShowCount(prev => ({ ...prev, [selectedItem.id]: showCount + TRANSCRIPTION_PAGE_SIZE }))}
+                            >
+                              Show more
+                            </button>
+                          )}
+                          {showCount > TRANSCRIPTION_PAGE_SIZE && (
+                            <button
+                              className="mt-2 ml-2 px-4 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+                              onClick={() => setTranscriptionShowCount(prev => ({ ...prev, [selectedItem.id]: TRANSCRIPTION_PAGE_SIZE }))}
+                            >
+                              Show less
+                            </button>
+                          )}
+                          {callAnalysis.transcription.lastUpdated && (
+                            <div className="mt-4 text-sm text-gray-500">
+                              Last updated: {format(new Date(callAnalysis.transcription.lastUpdated), 'PPpp')}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </details>
+                {/* Scoring Section */}
+                <details className="mb-4" open>
+                  <summary className="cursor-pointer text-gray-700 font-semibold py-2">Scoring</summary>
+                  <div className="p-4">
+                    {loadingScoring[selectedItem.id] ? (
+                      <div className="flex items-center space-x-2 text-blue-600">
+                        <Loader2 className="animate-spin" size={20} />
+                        <span>Generating scoring, please wait...</span>
+                      </div>
+                    ) : (() => {
+                      if (!documentAnalysis || !selectedItem?.id) {
+                        return <div className="text-gray-500 italic">No scoring available yet.</div>;
+                      }
+                      const analysis = documentAnalysis[selectedItem.id];
+                      if (!analysis || !('scoring' in analysis)) {
+                        return <div className="text-gray-500 italic">No scoring available yet.</div>;
+                      }
+                      const scoring = (analysis as any).scoring;
+                      if (scoring?.status !== 'completed' || !scoring?.result) {
+                        return <div className="text-gray-500 italic">No scoring available yet.</div>;
+                      }
+                      return (
+                        <div className="space-y-4">
+                          {Object.entries(scoring.result).map(([section, value]: [string, any]) => (
+                            <div key={section} className="bg-gray-50 p-4 rounded-lg">
+                              <div className="flex justify-between items-center mb-2 text-sm text-gray-500">
+                                <span className="font-medium">{section}</span>
+                                <span>Score: {value.score}</span>
+                              </div>
+                              <p className="text-gray-700">{value.feedback}</p>
+                            </div>
+                          ))}
+                          {scoring.lastUpdated && (
+                            <div className="mt-4 text-sm text-gray-500">
+                              Last updated: {format(new Date(scoring.lastUpdated), 'PPpp')}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </details>
+              </div>
             </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-1">No call recordings found</h3>
-            <p className="text-gray-500 max-w-md mx-auto">
-              {searchTerm
-                ? "No call recordings match your search. Try adjusting your search criteria."
-                : "Your call recordings library is empty. Upload your first call recording to get started."}
-            </p>
-            {!searchTerm && (
-              <button 
-                className="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center mx-auto"
-                onClick={() => setShowUploadModal(true)}
-              >
-                <Plus size={18} className="mr-2" />
-                Upload Your First Recording
-              </button>
-            )}
+          )}
+        </div>
+      );
+    } else {
+      return (
+        <div className="bg-white p-8 rounded-lg shadow-sm border border-gray-100 text-center">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 mb-4">
+            <File size={24} className="text-gray-400" />
           </div>
-        )}
-      </div>
-    );
+          <h3 className="text-lg font-medium text-gray-900 mb-1">No resources found</h3>
+          <p className="text-gray-500 max-w-md mx-auto">
+            {searchTerm || typeFilter !== 'all'
+              ? "No resources match your current search or filter. Try adjusting your criteria."
+              : "Your knowledge base is empty. Add documents or call recordings to get started."}
+          </p>
+          {!searchTerm && typeFilter === 'all' && (
+            <button 
+              className="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center mx-auto"
+              onClick={() => setShowUploadModal(true)}
+            >
+              <Plus size={18} className="mr-2" />
+              Add Your First Resource
+            </button>
+          )}
+        </div>
+      );
+    }
   };
 
   const renderUploadModal = () => {
@@ -1195,7 +1182,7 @@ const KnowledgeBase: React.FC = () => {
         <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl my-8 max-h-[90vh] flex flex-col">
           <div className="p-6 border-b border-gray-200 flex justify-between items-center flex-shrink-0">
             <h3 className="text-xl font-semibold text-gray-900">
-              {isDocumentsTab(activeTab) ? 'Add to Knowledge Base' : 'Upload Call Recording'}
+              Add to Knowledge Base
             </h3>
             <button
               type="button"
@@ -1208,204 +1195,124 @@ const KnowledgeBase: React.FC = () => {
           </div>
           
           <div className="overflow-y-auto flex-grow">
-            <form onSubmit={isDocumentsTab(activeTab) ? handleSubmit : handleCallSubmit}>
-              <div className="p-6">
-                {isDocumentsTab(activeTab) ? (
-                  <>
-                    <div className="mb-6">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Resource Type</label>
-                      <div className="grid grid-cols-2 gap-4">
-                        <button
-                          type="button"
-                          className={`p-4 rounded-lg border ${
-                            uploadType === 'document' 
-                              ? 'border-blue-500 bg-blue-50' 
-                              : 'border-gray-200 hover:bg-gray-50'
-                          } flex flex-col items-center justify-center`}
-                          onClick={() => setUploadType('document')}
-                        >
-                          <FileText size={24} className={uploadType === 'document' ? 'text-blue-500' : 'text-gray-500'} />
-                          <span className="mt-2 text-sm">Document</span>
-                        </button>
-                        
-                        <button
-                          type="button"
-                          className={`p-4 rounded-lg border ${
-                            uploadType === 'audio' 
-                              ? 'border-blue-500 bg-blue-50' 
-                              : 'border-gray-200 hover:bg-gray-50'
-                          } flex flex-col items-center justify-center`}
-                          onClick={() => setUploadType('audio')}
-                        >
-                          <Mic size={24} className={uploadType === 'audio' ? 'text-blue-500' : 'text-gray-500'} />
-                          <span className="mt-2 text-sm">Audio</span>
-                        </button>
-                      </div>
+            <form onSubmit={handleSubmit}>
+                              <div className="p-6">
+                  <div className="mb-6">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Resource Type</label>
+                    <div className="grid grid-cols-2 gap-4">
+                      <button
+                        type="button"
+                        className={`p-4 rounded-lg border ${
+                          uploadType === 'document' 
+                            ? 'border-blue-500 bg-blue-50' 
+                            : 'border-gray-200 hover:bg-gray-50'
+                        } flex flex-col items-center justify-center`}
+                        onClick={() => setUploadType('document')}
+                      >
+                        <FileText size={24} className={uploadType === 'document' ? 'text-blue-500' : 'text-gray-500'} />
+                        <span className="mt-2 text-sm">Document</span>
+                      </button>
+                      
+                      <button
+                        type="button"
+                        className={`p-4 rounded-lg border ${
+                          uploadType === 'audio' 
+                            ? 'border-blue-500 bg-blue-50' 
+                            : 'border-gray-200 hover:bg-gray-50'
+                        } flex flex-col items-center justify-center`}
+                        onClick={() => setUploadType('audio')}
+                      >
+                        <Mic size={24} className={uploadType === 'audio' ? 'text-blue-500' : 'text-gray-500'} />
+                        <span className="mt-2 text-sm">Call Recording</span>
+                      </button>
                     </div>
-                    
-                    <div className="mb-4">
-                      <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-                        Name
-                      </label>
-                      <input
-                        type="text"
-                        id="name"
-                        className="bg-gray-100 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
-                        placeholder="Enter a name for this resource"
-                        value={uploadName}
-                        onChange={(e) => setUploadName(e.target.value)}
-                        required
-                      />
-                    </div>
-                    
-                    <div className="mb-4">
-                      <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
-                        Description
-                      </label>
-                      <textarea
-                        id="description"
-                        rows={3}
-                        className="bg-gray-100 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
-                        placeholder="Describe what this resource contains"
-                        value={uploadDescription}
-                        onChange={(e) => setUploadDescription(e.target.value)}
-                        required
-                      />
-                    </div>
-                    
-                    {/* File upload section */}
-                    {(
-                      <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Upload File
-                        </label>
-                        <div className="flex items-center justify-center w-full">
-                          <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
-                            <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                              <Upload size={24} className="text-gray-400 mb-2" />
-                              <p className="mb-2 text-sm text-gray-500">
-                                <span className="font-semibold">Click to upload</span> or drag and drop
-                              </p>
-                              <p className="text-xs text-gray-500">
-                                {uploadType === 'document' 
-                                  ? 'PDF, DOCX, TXT, or other document formats' 
-                                  : 'MP3, WAV, or other audio formats'
-                                }
-                              </p>
-                            </div>
-                            <input 
-                              type="file" 
-                              className="hidden" 
-                              onChange={handleFileChange}
-                              accept={
-                                uploadType === 'document' 
-                                  ? ".pdf,.docx,.txt,.md,.csv,.xlsx" 
-                                  : ".mp3,.wav,.ogg,.m4a"
-                              }
-                            />
-                          </label>
-                        </div>
-                        {uploadFile && (
-                          <p className="mt-2 text-sm text-gray-600">
-                            Selected file: {uploadFile.name}
+                  </div>
+                  
+                  <div className="mb-4">
+                    <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
+                      {uploadType === 'document' ? 'Name' : 'Contact Name'}
+                    </label>
+                    <input
+                      type="text"
+                      id="name"
+                      className="bg-gray-100 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
+                      placeholder={uploadType === 'document' ? 'Enter a name for this resource' : 'Enter contact name for this call'}
+                      value={uploadName}
+                      onChange={(e) => setUploadName(e.target.value)}
+                      required
+                    />
+                  </div>
+                  
+                  <div className="mb-4">
+                    <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
+                      {uploadType === 'document' ? 'Description' : 'Call Summary'}
+                    </label>
+                    <textarea
+                      id="description"
+                      rows={3}
+                      className="bg-gray-100 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
+                      placeholder={uploadType === 'document' ? 'Describe what this resource contains' : 'Brief summary of the call'}
+                      value={uploadDescription}
+                      onChange={(e) => setUploadDescription(e.target.value)}
+                      required
+                    />
+                  </div>
+                  
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      {uploadType === 'document' ? 'Upload File' : 'Call Recording'}
+                    </label>
+                    <div className="flex items-center justify-center w-full">
+                      <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
+                        <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                          <Upload size={24} className="text-gray-400 mb-2" />
+                          <p className="mb-2 text-sm text-gray-500">
+                            <span className="font-semibold">Click to upload</span> or drag and drop
                           </p>
-                        )}
-                      </div>
+                          <p className="text-xs text-gray-500">
+                            {uploadType === 'document' 
+                              ? 'PDF, DOCX, TXT, or other document formats' 
+                              : 'MP3, WAV, or other audio formats'
+                            }
+                          </p>
+                        </div>
+                        <input 
+                          type="file" 
+                          className="hidden" 
+                          onChange={handleFileChange}
+                          accept={
+                            uploadType === 'document' 
+                              ? ".pdf,.docx,.txt,.md,.csv,.xlsx" 
+                              : ".mp3,.wav,.ogg,.m4a"
+                          }
+                          required
+                        />
+                      </label>
+                    </div>
+                    {uploadFile && (
+                      <p className="mt-2 text-sm text-gray-600">
+                        Selected file: {uploadFile.name}
+                      </p>
                     )}
-                    
-                    <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Tags
-                      </label>
-                      <input
-                        type="text"
-                        className="bg-gray-100 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
-                        placeholder="Enter tags separated by commas"
-                        value={uploadTags}
-                        onChange={(e) => setUploadTags(e.target.value)}
-                      />
-                      <p className="mt-1 text-xs text-gray-500">
-                        Example: product, api, technical
-                      </p>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="mb-4">
-                      <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-                        Name
-                      </label>
-                      <input
-                        type="text"
-                        id="name"
-                        className="bg-gray-100 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
-                        placeholder="Enter a name for this recording"
-                        value={uploadName}
-                        onChange={(e) => setUploadName(e.target.value)}
-                        required
-                      />
-                    </div>
-
-                    <div className="mb-4">
-                      <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
-                        Description
-                      </label>
-                      <textarea
-                        id="description"
-                        rows={3}
-                        className="bg-gray-100 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
-                        placeholder="Describe what this recording contains"
-                        value={uploadDescription}
-                        onChange={(e) => setUploadDescription(e.target.value)}
-                        required
-                      />
-                    </div>
-
-                    <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Call Recording
-                      </label>
-                      <div className="flex items-center justify-center w-full">
-                        <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
-                          <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                            <Upload size={24} className="text-gray-400 mb-2" />
-                            <p className="mb-2 text-sm text-gray-500">
-                              <span className="font-semibold">Click to upload</span> or drag and drop
-                            </p>
-                            <p className="text-xs text-gray-500">MP3, WAV, or other audio formats</p>
-                          </div>
-                          <input 
-                            type="file" 
-                            className="hidden" 
-                            onChange={handleFileChange}
-                            accept=".mp3,.wav,.ogg,.m4a"
-                            required
-                          />
-                        </label>
-                      </div>
-                      {uploadFile && (
-                        <p className="mt-2 text-sm text-gray-600">
-                          Selected file: {uploadFile.name}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Tags
-                      </label>
-                      <input
-                        type="text"
-                        className="bg-gray-100 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
-                        placeholder="Enter tags separated by commas"
-                        value={uploadTags}
-                        onChange={(e) => setUploadTags(e.target.value)}
-                      />
-                      <p className="mt-1 text-xs text-gray-500">
-                        Example: follow-up, sales, support
-                      </p>
-                    </div>
-
+                  </div>
+                  
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Tags
+                    </label>
+                    <input
+                      type="text"
+                      className="bg-gray-100 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
+                      placeholder="Enter tags separated by commas"
+                      value={uploadTags}
+                      onChange={(e) => setUploadTags(e.target.value)}
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                      Example: {uploadType === 'document' ? 'product, api, technical' : 'follow-up, sales, support'}
+                    </p>
+                  </div>
+                  
+                  {uploadType === 'audio' && (
                     <div className="mb-4">
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         AI Processing Options
@@ -1458,9 +1365,8 @@ const KnowledgeBase: React.FC = () => {
                         </div>
                       </div>
                     </div>
-                  </>
-                )}
-              </div>
+                  )}
+                </div>
               
               <div className="p-6 border-t border-gray-200 flex justify-end space-x-3 flex-shrink-0">
                 <button
@@ -1579,7 +1485,7 @@ const KnowledgeBase: React.FC = () => {
   };
 
   const renderAnalysisPage = () => {
-    if (!isDocumentsTab(activeTab) || !showAnalysisPage || !selectedDocumentForAnalysis) return null;
+    if (!showAnalysisPage || !selectedDocumentForAnalysis) return null;
 
     const analysis = documentAnalysis[selectedDocumentForAnalysis.id];
     if (!analysis) return null;
@@ -1697,33 +1603,7 @@ const KnowledgeBase: React.FC = () => {
         </p>
       </div>
       
-      {/* Tabs */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-100 mb-6">
-        <div className="flex border-b border-gray-100">
-          <button
-            className={`px-6 py-3 text-sm font-medium ${
-              isDocumentsTab(activeTab) 
-                ? 'text-blue-600 border-b-2 border-blue-600' 
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-            onClick={() => setActiveTab('documents')}
-          >
-            <FileText size={16} className="inline mr-2" />
-            Documents & Media
-          </button>
-          <button
-            className={`px-6 py-3 text-sm font-medium ${
-              isCallsTab(activeTab) 
-                ? 'text-blue-600 border-b-2 border-blue-600' 
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-            onClick={() => setActiveTab('calls')}
-          >
-            <Mic size={16} className="inline mr-2" />
-            Call Recordings
-          </button>
-        </div>
-      </div>
+
       
       {/* Filters and Search */}
       <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 mb-6">
@@ -1735,34 +1615,32 @@ const KnowledgeBase: React.FC = () => {
             <input
               type="text"
               className="bg-gray-100 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full pl-10 p-2.5"
-              placeholder={isDocumentsTab(activeTab) ? "Search knowledge base..." : "Search call recordings..."}
+              placeholder="Search knowledge base..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
           
           <div className="flex items-center space-x-4">
-            {isDocumentsTab(activeTab) && (
-              <div className="flex items-center space-x-2">
-                <Filter size={18} className="text-gray-500" />
-                <select
-                  className="bg-gray-100 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5"
-                  value={typeFilter}
-                  onChange={(e) => setTypeFilter(e.target.value)}
-                >
-                  <option value="all">All Types</option>
-                  <option value="document">Documents</option>
-                  <option value="audio">Audio</option>
-                </select>
-              </div>
-            )}
+            <div className="flex items-center space-x-2">
+              <Filter size={18} className="text-gray-500" />
+              <select
+                className="bg-gray-100 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5"
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+              >
+                <option value="all">All Types</option>
+                <option value="document">Documents</option>
+                <option value="audio">Audio / Call Recordings</option>
+              </select>
+            </div>
             
             <button 
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center"
               onClick={() => setShowUploadModal(true)}
             >
               <Plus size={18} className="mr-2" />
-              {isDocumentsTab(activeTab) ? 'Add Resource' : 'Upload Recording'}
+              Add Resource
             </button>
           </div>
         </div>
