@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Cookies from 'js-cookie';
 import Sidebar from './components/Sidebar';
-import Header from './components/Header';
 import Dashboard from './components/Dashboard';
 import ContactsList from './components/ContactsList';
 import AISearch from './components/AISearch';
@@ -49,7 +48,6 @@ function App() {
       <div className="flex h-screen bg-gray-50">
         <Sidebar progress={isInAppMode ? progress : null} />
         <div className="flex-1 flex flex-col overflow-hidden">
-          <Header onboardingProgress={isInAppMode ? progress : null} />
           <main className="flex-1 overflow-y-auto">
             <Routes>
               <Route path="/upload" element={<KnowledgeBase />} />
