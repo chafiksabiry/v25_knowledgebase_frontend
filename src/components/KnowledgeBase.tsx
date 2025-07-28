@@ -1230,13 +1230,13 @@ const KnowledgeBase: React.FC = () => {
                   
                   <div className="mb-4">
                     <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-                      {uploadType === 'document' ? 'Name' : 'Contact Name'}
+                      Name
                     </label>
                     <input
                       type="text"
                       id="name"
                       className="bg-gray-100 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
-                      placeholder={uploadType === 'document' ? 'Enter a name for this resource' : 'Enter contact name for this call'}
+                      placeholder={uploadType === 'document' ? 'Enter a name for this resource' : 'Enter a name for this recording'}
                       value={uploadName}
                       onChange={(e) => setUploadName(e.target.value)}
                       required
@@ -1245,13 +1245,13 @@ const KnowledgeBase: React.FC = () => {
                   
                   <div className="mb-4">
                     <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
-                      {uploadType === 'document' ? 'Description' : 'Call Summary'}
+                      Description
                     </label>
                     <textarea
                       id="description"
                       rows={3}
                       className="bg-gray-100 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
-                      placeholder={uploadType === 'document' ? 'Describe what this resource contains' : 'Brief summary of the call'}
+                      placeholder={uploadType === 'document' ? 'Describe what this resource contains' : 'Describe what this recording contains'}
                       value={uploadDescription}
                       onChange={(e) => setUploadDescription(e.target.value)}
                       required
@@ -1260,7 +1260,7 @@ const KnowledgeBase: React.FC = () => {
                   
                   <div className="mb-4">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      {uploadType === 'document' ? 'Upload File' : 'Call Recording'}
+                      Upload File
                     </label>
                     <div className="flex items-center justify-center w-full">
                       <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
