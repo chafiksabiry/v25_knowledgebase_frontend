@@ -586,7 +586,8 @@ const KnowledgeBase: React.FC = () => {
       // Handle document view
       setSelectedDocumentForAnalysis(item);
       setShowAnalysisPage(true);
-      if (!documentAnalysis[item.id]) {
+      // Always trigger analysis if it doesn't exist or is incomplete
+      if (!documentAnalysis[item.id] || !documentAnalysis[item.id].summary) {
         await analyzeDocument(item.id);
       }
     }
