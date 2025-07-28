@@ -123,10 +123,6 @@ const KnowledgeBase: React.FC = () => {
     switch (type) {
       case 'document':
         return <FileText size={20} className="text-blue-500" />;
-      case 'video':
-        return <Video size={20} className="text-red-500" />;
-      case 'link':
-        return <LinkIcon size={20} className="text-green-500" />;
       case 'audio':
         return <Mic size={20} className="text-purple-500" />;
       default:
@@ -863,9 +859,8 @@ const KnowledgeBase: React.FC = () => {
                   <div className="flex items-center justify-between">
                     <span className={`px-2 py-1 text-xs rounded-full whitespace-nowrap ${
                       item.type === 'document' ? 'bg-blue-100 text-blue-800' : 
-                      item.type === 'video' ? 'bg-red-100 text-red-800' : 
                       item.type === 'audio' ? 'bg-purple-100 text-purple-800' :
-                      'bg-green-100 text-green-800'
+                      'bg-gray-100 text-gray-800'
                     }`}>
                       {item.type.charAt(0).toUpperCase() + item.type.slice(1)}
                     </span>
@@ -1219,7 +1214,7 @@ const KnowledgeBase: React.FC = () => {
                   <>
                     <div className="mb-6">
                       <label className="block text-sm font-medium text-gray-700 mb-2">Resource Type</label>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="grid grid-cols-2 gap-4">
                         <button
                           type="button"
                           className={`p-4 rounded-lg border ${
@@ -1231,32 +1226,6 @@ const KnowledgeBase: React.FC = () => {
                         >
                           <FileText size={24} className={uploadType === 'document' ? 'text-blue-500' : 'text-gray-500'} />
                           <span className="mt-2 text-sm">Document</span>
-                        </button>
-                        
-                        <button
-                          type="button"
-                          className={`p-4 rounded-lg border ${
-                            uploadType === 'video' 
-                              ? 'border-blue-500 bg-blue-50' 
-                              : 'border-gray-200 hover:bg-gray-50'
-                          } flex flex-col items-center justify-center`}
-                          onClick={() => setUploadType('video')}
-                        >
-                          <Video size={24} className={uploadType === 'video' ? 'text-blue-500' : 'text-gray-500'} />
-                          <span className="mt-2 text-sm">Video</span>
-                        </button>
-                        
-                        <button
-                          type="button"
-                          className={`p-4 rounded-lg border ${
-                            uploadType === 'link' 
-                              ? 'border-blue-500 bg-blue-50' 
-                              : 'border-gray-200 hover:bg-gray-50'
-                          } flex flex-col items-center justify-center`}
-                          onClick={() => setUploadType('link')}
-                        >
-                          <LinkIcon size={24} className={uploadType === 'link' ? 'text-blue-500' : 'text-gray-500'} />
-                          <span className="mt-2 text-sm">Link</span>
                         </button>
                         
                         <button
@@ -1304,22 +1273,8 @@ const KnowledgeBase: React.FC = () => {
                       />
                     </div>
                     
-                    {uploadType === 'link' ? (
-                      <div className="mb-4">
-                        <label htmlFor="url" className="block text-sm font-medium text-gray-700 mb-2">
-                          URL
-                        </label>
-                        <input
-                          type="url"
-                          id="url"
-                          className="bg-gray-100 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
-                          placeholder="https://example.com"
-                          value={uploadUrl}
-                          onChange={(e) => setUploadUrl(e.target.value)}
-                          required
-                        />
-                      </div>
-                    ) : (
+                    {/* File upload section */}
+                    {(
                       <div className="mb-4">
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Upload File
@@ -1334,9 +1289,7 @@ const KnowledgeBase: React.FC = () => {
                               <p className="text-xs text-gray-500">
                                 {uploadType === 'document' 
                                   ? 'PDF, DOCX, TXT, or other document formats' 
-                                  : uploadType === 'video'
-                                    ? 'MP4, MOV, or other video formats'
-                                    : 'MP3, WAV, or other audio formats'
+                                  : 'MP3, WAV, or other audio formats'
                                 }
                               </p>
                             </div>
@@ -1347,9 +1300,7 @@ const KnowledgeBase: React.FC = () => {
                               accept={
                                 uploadType === 'document' 
                                   ? ".pdf,.docx,.txt,.md,.csv,.xlsx" 
-                                  : uploadType === 'video'
-                                    ? ".mp4,.mov,.avi,.webm"
-                                    : ".mp3,.wav,.ogg,.m4a"
+                                  : ".mp3,.wav,.ogg,.m4a"
                               }
                             />
                           </label>
@@ -1801,8 +1752,6 @@ const KnowledgeBase: React.FC = () => {
                 >
                   <option value="all">All Types</option>
                   <option value="document">Documents</option>
-                  <option value="video">Videos</option>
-                  <option value="link">Links</option>
                   <option value="audio">Audio</option>
                 </select>
               </div>
