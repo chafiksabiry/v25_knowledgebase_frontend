@@ -51,7 +51,7 @@ interface CallAnalysis {
 type AnalysisResult = DocumentAnalysis | CallAnalysis;
 
 const KnowledgeBase: React.FC = () => {
-  const [searchTerm, setSearchTerm] = useState('');
+
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploadType, setUploadType] = useState<string>('document');
@@ -106,17 +106,7 @@ const KnowledgeBase: React.FC = () => {
     localStorage.setItem('knowledgeItems', JSON.stringify(knowledgeItems));
   }, [knowledgeItems]);
   
-  // Filter knowledge base items based on search and type
-  const filteredItems = knowledgeItems.filter(item => {
-    const matchesSearch = 
-      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
-    
-    const matchesType = typeFilter === 'all' || item.type === typeFilter;
-    
-    return matchesSearch && matchesType;
-  });
+
   
   // Get icon based on item type
   const getItemIcon = (type: string) => {
@@ -802,23 +792,18 @@ const KnowledgeBase: React.FC = () => {
   // Create unified items list combining documents and call recordings
   const getUnifiedItems = () => {
     // Convert documents to unified format
-    const documentItems = filteredItems.map(item => ({
-      ...item,
-      itemType: 'document' as const,
-      date: item.uploadedAt,
-      isCallRecording: false
-    }));
+    const documentItems = knowledgeItems
+      .filter(item => typeFilter === 'all' || item.type === typeFilter)
+      .map(item => ({
+        ...item,
+        itemType: 'document' as const,
+        date: item.uploadedAt,
+        isCallRecording: false
+      }));
 
     // Convert call recordings to unified format  
     const callItems = callRecords
-      .filter(call => {
-        const matchesSearch = 
-          call.contactId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          call.summary.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          call.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
-        const matchesType = typeFilter === 'all' || typeFilter === 'audio';
-        return matchesSearch && matchesType;
-      })
+      .filter(call => typeFilter === 'all' || typeFilter === 'audio')
       .map(call => ({
         id: call.id,
         name: call.contactId,
@@ -1157,11 +1142,11 @@ const KnowledgeBase: React.FC = () => {
           </div>
           <h3 className="text-lg font-medium text-gray-900 mb-1">No resources found</h3>
           <p className="text-gray-500 max-w-md mx-auto">
-            {searchTerm || typeFilter !== 'all'
-              ? "No resources match your current search or filter. Try adjusting your criteria."
+            {typeFilter !== 'all'
+              ? `No ${typeFilter === 'document' ? 'documents' : 'audio recordings'} found. Try changing the filter or add new resources.`
               : "Your knowledge base is empty. Add documents or call recordings to get started."}
           </p>
-          {!searchTerm && typeFilter === 'all' && (
+          {typeFilter === 'all' && (
             <button 
               className="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center mx-auto"
               onClick={() => setShowUploadModal(true)}
@@ -1606,44 +1591,29 @@ const KnowledgeBase: React.FC = () => {
       
 
       
-      {/* Filters and Search */}
+      {/* Filter and Add Resource */}
       <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 mb-6">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
-          <div className="relative w-full md:w-96">
-            <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-              <Search size={18} className="text-gray-400" />
-            </div>
-            <input
-              type="text"
-              className="bg-gray-100 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full pl-10 p-2.5"
-              placeholder="Search knowledge base..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+        <div className="flex justify-between items-center">
+          <div className="flex items-center space-x-2">
+            <Filter size={18} className="text-gray-500" />
+            <select
+              className="bg-gray-100 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5"
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+            >
+              <option value="all">All Types</option>
+              <option value="document">Documents</option>
+              <option value="audio">Audio / Call Recordings</option>
+            </select>
           </div>
           
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
-              <Filter size={18} className="text-gray-500" />
-              <select
-                className="bg-gray-100 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5"
-                value={typeFilter}
-                onChange={(e) => setTypeFilter(e.target.value)}
-              >
-                <option value="all">All Types</option>
-                <option value="document">Documents</option>
-                <option value="audio">Audio / Call Recordings</option>
-              </select>
-            </div>
-            
-            <button 
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center"
-              onClick={() => setShowUploadModal(true)}
-            >
-              <Plus size={18} className="mr-2" />
-              Add Resource
-            </button>
-          </div>
+          <button 
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center"
+            onClick={() => setShowUploadModal(true)}
+          >
+            <Plus size={18} className="mr-2" />
+            Add Resource
+          </button>
         </div>
       </div>
 
