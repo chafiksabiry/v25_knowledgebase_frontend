@@ -340,18 +340,16 @@ const KnowledgeBase: React.FC = () => {
         const response = await apiClient.post('/documents/upload', formData);
         console.log('Document upload successful:', response.data);
 
-        // Fetch latest documents to check if this was the first upload
-        const hasMultipleDocuments = await fetchAndUpdateDocuments();
+        // Fetch latest documents
+        await fetchAndUpdateDocuments();
         
-        // If we don't have multiple documents yet, this is the first upload
-        if (!hasMultipleDocuments) {
-          console.log('Updating onboarding progress for first upload');
-          try {
-            await updateOnboardingProgress();
-            console.log('Successfully updated onboarding progress');
-          } catch (error) {
-            console.error('Failed to update onboarding progress:', error);
-          }
+        // Update onboarding progress for every document upload
+        console.log('Updating onboarding progress for document upload');
+        try {
+          await updateOnboardingProgress();
+          console.log('Successfully updated onboarding progress');
+        } catch (error) {
+          console.error('Failed to update onboarding progress:', error);
         }
       } else if (uploadType === 'audio') {
         // Handle call recording upload
