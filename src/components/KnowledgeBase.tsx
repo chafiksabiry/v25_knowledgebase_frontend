@@ -195,6 +195,13 @@ const KnowledgeBase: React.FC = () => {
       const response = await axios.put(endpoint, { status: "completed" });
 
       console.log('Onboarding progress update response:', response.data);
+      
+      // Update the companyOnboardingProgress cookie with the response data
+      if (response.data) {
+        Cookies.set('companyOnboardingProgress', JSON.stringify(response.data), { expires: 7 });
+        console.log('Updated companyOnboardingProgress cookie with new data');
+      }
+      
       return response.data;
     } catch (error) {
       console.error('Error updating onboarding progress:', error);
