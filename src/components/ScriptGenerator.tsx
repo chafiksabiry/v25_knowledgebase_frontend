@@ -283,6 +283,13 @@ const ScriptGenerator: React.FC = () => {
       const endpoint = `${apiUrl}/onboarding/companies/${companyId}/onboarding/phases/2/steps/8`;
       const response = await apiClient.put(endpoint, { status: 'completed' });
       console.log('Onboarding progress (script) update response:', response.data);
+      
+      // Update the companyOnboardingProgress cookie with the response data
+      if (response.data) {
+        Cookies.set('companyOnboardingProgress', JSON.stringify(response.data), { expires: 7 });
+        console.log('Updated companyOnboardingProgress cookie with new data');
+      }
+      
       return response.data;
     } catch (error) {
       console.error('Error updating onboarding progress (script):', error);
