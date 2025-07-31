@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import apiClient from '../api/client';
 import Cookies from 'js-cookie';
-import { User, Headphones, Plus, ArrowLeft, Eye, Calendar, Target, Globe, Trash2 } from 'lucide-react';
+import { User, Headphones, Plus, ArrowLeft, Eye, Calendar, Target, Globe, Trash2, ToggleLeft, ToggleRight, Filter } from 'lucide-react';
 
 interface ScriptResponse {
   success: boolean;
@@ -143,6 +143,7 @@ interface Script {
   language: string;
   details?: string;
   script: { phase: string; actor: string; replica: string }[];
+  isActive: boolean; // Add isActive field
   createdAt: string;
   gig?: Gig;
 }
@@ -165,6 +166,8 @@ const ScriptGenerator: React.FC = () => {
   const [view, setView] = useState<'table' | 'form' | 'script'>('table');
   const [selectedScript, setSelectedScript] = useState<Script | null>(null);
   const [deletingScriptId, setDeletingScriptId] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all'); // Add status filter
+  const [updatingScriptId, setUpdatingScriptId] = useState<string | null>(null); // Track which script is being updated
 
   const getCompanyId = () => {
     const runMode = import.meta.env.VITE_RUN_MODE || 'in-app';
@@ -229,8 +232,14 @@ const ScriptGenerator: React.FC = () => {
       if (!companyId) throw new Error('Company ID not found');
       const backendUrl = import.meta.env.VITE_BACKEND_API;
       if (!backendUrl) throw new Error('Backend API URL not configured');
-      const url = `${backendUrl}/api/scripts/company/${companyId}`;
-      console.log('[SCRIPTS] Fetching all scripts for companyId:', companyId, 'URL:', url);
+      
+      // Add status filter to URL if not 'all'
+      let url = `${backendUrl}/api/scripts/company/${companyId}`;
+      if (statusFilter !== 'all') {
+        url += `?status=${statusFilter}`;
+      }
+      
+      console.log('[SCRIPTS] Fetching scripts for companyId:', companyId, 'with filter:', statusFilter, 'URL:', url);
       const response = await fetch(url);
       if (!response.ok) throw new Error(`Failed to fetch scripts: ${response.statusText}`);
       const data = await response.json();
@@ -270,6 +279,11 @@ const ScriptGenerator: React.FC = () => {
     fetchGigs();
     fetchAllScripts();
   }, []);
+
+  // Refetch scripts when status filter changes
+  useEffect(() => {
+    fetchAllScripts();
+  }, [statusFilter]);
 
   const handleGigSelection = (gig: Gig) => {
     setSelectedGig(gig);
@@ -371,6 +385,49 @@ const ScriptGenerator: React.FC = () => {
     setSelectedScript(null);
   };
 
+  const handleUpdateScriptStatus = async (scriptId: string, isActive: boolean) => {
+    setUpdatingScriptId(scriptId);
+    try {
+      const backendUrl = import.meta.env.VITE_BACKEND_API;
+      if (!backendUrl) throw new Error('Backend API URL not configured');
+      
+      const response = await fetch(`${backendUrl}/api/scripts/${scriptId}/status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ isActive }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to update script status: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('[SCRIPTS] Script status updated successfully:', data);
+
+      // Update the script in the local state
+      setScripts(prevScripts => 
+        prevScripts.map(script => 
+          script._id === scriptId 
+            ? { ...script, isActive } 
+            : script
+        )
+      );
+
+      // If the updated script was selected, update the selected script as well
+      if (selectedScript?._id === scriptId) {
+        setSelectedScript(prev => prev ? { ...prev, isActive } : null);
+      }
+
+    } catch (err: any) {
+      console.error('[SCRIPTS] Error updating script status:', err);
+      alert(`Failed to update script status: ${err.message}`);
+    } finally {
+      setUpdatingScriptId(null);
+    }
+  };
+
   const handleDeleteScript = async (scriptId: string) => {
     if (!confirm('Are you sure you want to delete this script? This action cannot be undone.')) {
       return;
@@ -460,11 +517,29 @@ const ScriptGenerator: React.FC = () => {
         {view === 'table' && (
           <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
             <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-blue-50">
-              <h3 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
-                <Target className="w-6 h-6 text-blue-600" />
-                Your Generated Scripts
-              </h3>
-              <p className="text-gray-600 text-sm mt-1">Manage and view all your call scripts</p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
+                    <Target className="w-6 h-6 text-blue-600" />
+                    Your Generated Scripts
+                  </h3>
+                  <p className="text-gray-600 text-sm mt-1">Manage and view all your call scripts</p>
+                </div>
+                
+                {/* Status Filter */}
+                <div className="flex items-center gap-2">
+                  <Filter className="w-4 h-4 text-gray-500" />
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}
+                    className="px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                  >
+                    <option value="all">All Scripts</option>
+                    <option value="active">Active Scripts</option>
+                    <option value="inactive">Inactive Scripts</option>
+                  </select>
+                </div>
+              </div>
             </div>
             
             {isLoadingScripts ? (
@@ -511,6 +586,7 @@ const ScriptGenerator: React.FC = () => {
                       <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Gig</th>
                       <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Target Client</th>
                       <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Language</th>
+                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Status</th>
                       <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Created</th>
                       <th className="px-6 py-4 text-center text-sm font-semibold text-gray-700">Actions</th>
                     </tr>
@@ -546,6 +622,20 @@ const ScriptGenerator: React.FC = () => {
                             </div>
                           </td>
                           <td className="px-6 py-4">
+                            <div className="flex items-center gap-2">
+                              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                                script.isActive 
+                                  ? 'bg-green-100 text-green-800' 
+                                  : 'bg-gray-100 text-gray-800'
+                              }`}>
+                                <div className={`w-2 h-2 rounded-full mr-1 ${
+                                  script.isActive ? 'bg-green-500' : 'bg-gray-500'
+                                }`}></div>
+                                {script.isActive ? 'Active' : 'Inactive'}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
                             <div className="flex items-center gap-2 text-gray-600">
                               <Calendar className="w-4 h-4" />
                               <span className="text-sm">{new Date(script.createdAt).toLocaleDateString()}</span>
@@ -560,6 +650,30 @@ const ScriptGenerator: React.FC = () => {
                               >
                                 <Eye className="w-4 h-4" />
                                 View
+                              </button>
+                              <button
+                                className={`inline-flex items-center gap-1 px-3 py-2 rounded-lg transition-all duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed ${
+                                  script.isActive
+                                    ? 'text-orange-600 hover:text-orange-800 hover:bg-orange-50'
+                                    : 'text-green-600 hover:text-green-800 hover:bg-green-50'
+                                }`}
+                                onClick={() => handleUpdateScriptStatus(script._id, !script.isActive)}
+                                disabled={updatingScriptId === script._id}
+                                title={script.isActive ? 'Deactivate script' : 'Activate script'}
+                              >
+                                {updatingScriptId === script._id ? (
+                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
+                                ) : script.isActive ? (
+                                  <ToggleRight className="w-4 h-4" />
+                                ) : (
+                                  <ToggleLeft className="w-4 h-4" />
+                                )}
+                                {updatingScriptId === script._id 
+                                  ? 'Updating...' 
+                                  : script.isActive 
+                                    ? 'Deactivate' 
+                                    : 'Activate'
+                                }
                               </button>
                               <button
                                 className="inline-flex items-center gap-1 px-3 py-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-all duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
@@ -602,7 +716,7 @@ const ScriptGenerator: React.FC = () => {
             </div>
             
             <div className="p-6 border-b border-gray-100 bg-gray-50">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                 <div className="flex items-center gap-2">
                   <Target className="w-4 h-4 text-blue-600" />
                   <div>
@@ -622,6 +736,19 @@ const ScriptGenerator: React.FC = () => {
                   <div>
                     <p className="text-xs text-gray-500 uppercase tracking-wide">Language</p>
                     <p className="font-medium text-gray-800">{selectedScript.language}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {selectedScript.isActive ? (
+                    <ToggleRight className="w-4 h-4 text-green-600" />
+                  ) : (
+                    <ToggleLeft className="w-4 h-4 text-gray-600" />
+                  )}
+                  <div>
+                    <p className="text-xs text-gray-500 uppercase tracking-wide">Status</p>
+                    <p className={`font-medium ${selectedScript.isActive ? 'text-green-800' : 'text-gray-800'}`}>
+                      {selectedScript.isActive ? 'Active' : 'Inactive'}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
