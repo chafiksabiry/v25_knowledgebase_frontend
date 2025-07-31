@@ -89,10 +89,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // 4. Construire l'URL complète pour rediriger vers l'app principale
     const mainAppUrl = getMainAppUrl();
     
-    // 5. Nettoyer l'historique du navigateur pour empêcher le retour
-    window.history.replaceState(null, '', mainAppUrl);
-    
-    // 6. Rediriger vers l'application principale (pas la sous-app)
+    // 5. Redirection immédiate vers l'application principale pour éviter les redirections multiples
     window.location.replace(mainAppUrl);
   };
 
