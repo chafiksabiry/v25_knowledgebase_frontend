@@ -3,7 +3,7 @@ import apiClient from '../api/client';
 import Cookies from 'js-cookie';
 import { 
   User, Headphones, Plus, ArrowLeft, Eye, Calendar, Target, Globe, Trash2, ToggleLeft, ToggleRight, Filter,
-  FileText, HandHeart, Shield, Search, Star, FileCheck, AlertTriangle, CheckCircle
+  FileText, HandHeart, Shield, Search, Star, FileCheck, AlertTriangle, CheckCircle, RefreshCw, Edit2, MessageSquare
 } from 'lucide-react';
 
 interface ScriptResponse {
@@ -272,6 +272,10 @@ const ScriptGenerator: React.FC = () => {
   const [deletingScriptId, setDeletingScriptId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all'); // Add status filter
   const [updatingScriptId, setUpdatingScriptId] = useState<string | null>(null); // Track which script is being updated
+  // Add new state for regeneration loading
+  const [regeneratingScriptId, setRegeneratingScriptId] = useState<string | null>(null);
+  // Add new state for tracking processing steps
+  const [processingSteps, setProcessingSteps] = useState<number[]>([]);
 
   const getCompanyId = () => {
     const runMode = import.meta.env.VITE_RUN_MODE || 'in-app';
@@ -570,6 +574,153 @@ const ScriptGenerator: React.FC = () => {
     }
   };
 
+  // Ajout des nouvelles fonctions de modification
+  const handleRegenerateScript = async (scriptId: string) => {
+    if (!confirm('Are you sure you want to regenerate this script? The current version will be replaced.')) {
+      return;
+    }
+
+    setRegeneratingScriptId(scriptId);
+    try {
+      const backendUrl = import.meta.env.VITE_BACKEND_API;
+      const companyId = getCompanyId();
+      if (!backendUrl) throw new Error('Backend API URL not configured');
+      if (!companyId) throw new Error('Company ID not found');
+      
+      const response = await fetch(`${backendUrl}/api/scripts/${scriptId}/regenerate`, {
+        method: 'POST',
+        headers: {
+          'X-Company-ID': companyId
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to regenerate script: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('[SCRIPTS] Script regenerated successfully:', data);
+
+      // Update the script in the local state
+      setScripts(prevScripts => 
+        prevScripts.map(script => 
+          script._id === scriptId 
+            ? data.data
+            : script
+        )
+      );
+
+      // Update selected script if it was the one regenerated
+      if (selectedScript?._id === scriptId) {
+        setSelectedScript(data.data);
+      }
+
+    } catch (err: any) {
+      console.error('[SCRIPTS] Error regenerating script:', err);
+      alert(`Failed to regenerate script: ${err.message}`);
+    } finally {
+      setRegeneratingScriptId(null);
+    }
+  };
+
+  const handleRefineScriptPart = async (scriptId: string, stepIndex: number, refinementPrompt: string) => {
+    try {
+      setProcessingSteps(prev => [...prev, stepIndex]);
+      const backendUrl = import.meta.env.VITE_BACKEND_API;
+      const companyId = getCompanyId();
+      if (!backendUrl) throw new Error('Backend API URL not configured');
+      if (!companyId) throw new Error('Company ID not found');
+      
+      const response = await fetch(`${backendUrl}/api/scripts/${scriptId}/refine`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Company-ID': companyId
+        },
+        body: JSON.stringify({ stepIndex, refinementPrompt }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to refine script: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('[SCRIPTS] Script part refined successfully:', data);
+
+      // Update the script in the local state
+      setScripts(prevScripts => 
+        prevScripts.map(script => 
+          script._id === scriptId 
+            ? data.data.fullScript
+            : script
+        )
+      );
+
+      // Update selected script if it was the one refined
+      if (selectedScript?._id === scriptId) {
+        setSelectedScript(data.data.fullScript);
+      }
+
+    } catch (err: any) {
+      console.error('[SCRIPTS] Error refining script:', err);
+      alert(`Failed to refine script: ${err.message}`);
+    } finally {
+      setProcessingSteps(prev => prev.filter(id => id !== stepIndex));
+    }
+  };
+
+  const handleUpdateScriptContent = async (scriptId: string, stepIndex: number, newContent: { replica: string }) => {
+    try {
+      // Mettre à jour l'état avant la requête
+      setProcessingSteps(prev => [...prev, stepIndex]);
+      
+      const backendUrl = import.meta.env.VITE_BACKEND_API;
+      if (!backendUrl) throw new Error('Backend API URL not configured');
+      
+      // Petit délai pour assurer que l'état est mis à jour
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      const response = await fetch(`${backendUrl}/api/scripts/${scriptId}/content`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ stepIndex, newContent }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to update script content: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('[SCRIPTS] Script content updated successfully:', data);
+
+      // Update the script in the local state
+      setScripts(prevScripts => 
+        prevScripts.map(script => 
+          script._id === scriptId 
+            ? data.data.fullScript
+            : script
+        )
+      );
+
+      // Update selected script if it was the one updated
+      if (selectedScript?._id === scriptId) {
+        setSelectedScript(data.data.fullScript);
+      }
+
+    } catch (err: any) {
+      console.error('[SCRIPTS] Error updating script content:', err);
+      alert(`Failed to update script content: ${err.message}`);
+    } finally {
+      setProcessingSteps(prev => prev.filter(id => id !== stepIndex));
+    }
+  };
+
+  // État pour gérer l'édition
+  const [editingStep, setEditingStep] = useState<{ index: number; text: string } | null>(null);
+  const [refiningStep, setRefiningStep] = useState<{ index: number; prompt: string } | null>(null);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
       <div className="max-w-6xl mx-auto p-6">
@@ -623,11 +774,11 @@ const ScriptGenerator: React.FC = () => {
             <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-blue-50">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
-                    <Target className="w-6 h-6 text-blue-600" />
-                    Your Generated Scripts
-                  </h3>
-                  <p className="text-gray-600 text-sm mt-1">Manage and view all your call scripts</p>
+              <h3 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
+                <Target className="w-6 h-6 text-blue-600" />
+                Your Generated Scripts
+              </h3>
+              <p className="text-gray-600 text-sm mt-1">Manage and view all your call scripts</p>
                 </div>
                 
                 {/* Status Filter */}
@@ -676,14 +827,14 @@ const ScriptGenerator: React.FC = () => {
                 {/* Different messages based on the current filter */}
                 {statusFilter === 'all' ? (
                   <>
-                    <h4 className="text-lg font-medium text-gray-700 mb-2">No scripts yet</h4>
-                    <p className="text-gray-500 mb-6">Create your first call script to get started</p>
-                    <button
-                      className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2 font-medium mx-auto"
-                      onClick={handleShowFormClick}
-                    >
-                      <Plus className="w-5 h-5" />
-                      Generate Your First Script
+                <h4 className="text-lg font-medium text-gray-700 mb-2">No scripts yet</h4>
+                <p className="text-gray-500 mb-6">Create your first call script to get started</p>
+                <button
+                  className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2 font-medium mx-auto"
+                  onClick={handleShowFormClick}
+                >
+                  <Plus className="w-5 h-5" />
+                  Generate Your First Script
                     </button>
                   </>
                 ) : statusFilter === 'active' ? (
@@ -704,7 +855,7 @@ const ScriptGenerator: React.FC = () => {
                       >
                         <Filter className="w-5 h-5" />
                         View All Scripts
-                      </button>
+                </button>
                     </div>
                   </>
                 ) : (
@@ -758,9 +909,13 @@ const ScriptGenerator: React.FC = () => {
                               </div>
                               <div className="flex-1">
                                 <div className="flex items-center gap-2">
-                                  <p className="font-semibold text-gray-800">{gig?.title || 'Untitled Gig'}</p>
+                                  <p className="font-semibold text-gray-800">
+                                    {script.gig?.title || 'Untitled Gig'}
+                                  </p>
                                 </div>
-                                <p className="text-sm text-gray-500">{gig?.category || script.gigId}</p>
+                                <p className="text-sm text-gray-500">
+                                  {script.gig?.category || 'No category'}
+                                </p>
                               </div>
                             </div>
                           </td>
@@ -859,28 +1014,39 @@ const ScriptGenerator: React.FC = () => {
           <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden animate-fade-in">
             <div className="p-6 bg-gradient-to-r from-blue-600 to-purple-600 text-white">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-white/20 rounded-xl">
-                    <Headphones className="w-8 h-8" />
-                  </div>
-                  <div>
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-white/20 rounded-xl">
+                  <Headphones className="w-8 h-8" />
+                </div>
+                <div>
                     <div className="flex items-center gap-3 mb-1">
-                      <h3 className="text-2xl font-bold">Call Script</h3>
+                  <h3 className="text-2xl font-bold">Call Script</h3>
                       <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-white/20 text-white border border-white/30">
                         Structured Call
                       </span>
-                    </div>
+                </div>
                     <p className="text-blue-100">Ready to use conversation guide with structured phases</p>
                   </div>
                 </div>
                 
-                {/* Phase count indicator */}
-                <div className="text-right">
-                  <div className="text-sm text-blue-100">Script Phases</div>
-                  <div className="text-2xl font-bold">
-                    {groupScriptByPhase(selectedScript.script).length}
-                  </div>
-                </div>
+                {/* Add Regenerate button */}
+                <button
+                  onClick={() => handleRegenerateScript(selectedScript._id)}
+                  disabled={regeneratingScriptId === selectedScript._id}
+                  className="px-4 py-2 bg-white/20 hover:bg-white/30 disabled:bg-white/10 disabled:cursor-not-allowed rounded-lg flex items-center gap-2 transition-all duration-200"
+                >
+                  {regeneratingScriptId === selectedScript._id ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Regenerating...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="w-4 h-4" />
+                      Regenerate Script
+                    </>
+                  )}
+                </button>
               </div>
             </div>
             
@@ -890,7 +1056,12 @@ const ScriptGenerator: React.FC = () => {
                   <Target className="w-4 h-4 text-blue-600" />
                   <div>
                     <p className="text-xs text-gray-500 uppercase tracking-wide">Gig</p>
-                    <p className="font-medium text-gray-800">{selectedScript.gig?.title || selectedScript.gig?.category || selectedScript.gigId}</p>
+                    <p className="font-medium text-gray-800">
+                      {selectedScript.gig?.title || 'Untitled Gig'}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {selectedScript.gig?.category || 'No category'}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -935,9 +1106,16 @@ const ScriptGenerator: React.FC = () => {
               )}
             </div>
 
+            {/* Script content with edit options */}
             <div className="p-6">
               <div className="space-y-8">
-                {Array.isArray(selectedScript.script) && selectedScript.script.length > 0 ? (
+                {regeneratingScriptId === selectedScript?._id ? (
+                  <div className="flex flex-col items-center justify-center py-12">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+                    <p className="text-gray-600 font-medium">Regenerating Script...</p>
+                    <p className="text-sm text-gray-500 mt-2">This may take a few moments</p>
+                  </div>
+                ) : Array.isArray(selectedScript?.script) && selectedScript.script.length > 0 ? (
                   groupScriptByPhase(selectedScript.script).map((phaseGroup, phaseIdx) => {
                     const phaseConfig = getPhaseConfig(phaseGroup.phaseName);
                     const PhaseIcon = phaseConfig.icon;
@@ -961,42 +1139,149 @@ const ScriptGenerator: React.FC = () => {
                           </div>
                         </div>
 
-                        {/* Phase Steps */}
+                        {/* Phase Steps with edit options */}
                         <div className="space-y-4 ml-4 border-l-2 border-gray-200 pl-6 relative">
-                          {phaseGroup.steps.map((step, stepIdx) => (
-                            <div key={stepIdx} className="flex items-start gap-4 group relative">
-                              {/* Connection line dot */}
-                              <div className={`absolute -left-7 top-4 w-3 h-3 rounded-full border-2 border-white shadow-sm ${phaseConfig.bgColor} ${phaseConfig.borderColor}`}></div>
-                              
-                              <div className="flex-shrink-0">
-                                {step.actor === 'agent' ? (
-                                  <div className="p-3 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl shadow-lg">
-                                    <Headphones className="w-5 h-5 text-white" />
+                          {phaseGroup.steps.map((step, stepIdx) => {
+                            const globalStepIdx = selectedScript.script.findIndex(s => 
+                              s.phase === step.phase && s.actor === step.actor && s.replica === step.replica
+                            );
+                            
+                            return (
+                              <div key={stepIdx} className="flex items-start gap-4 group relative">
+                                {/* Connection line dot */}
+                                <div className={`absolute -left-7 top-4 w-3 h-3 rounded-full border-2 border-white shadow-sm ${phaseConfig.bgColor} ${phaseConfig.borderColor}`}></div>
+                                
+                                <div className="flex-shrink-0">
+                        {step.actor === 'agent' ? (
+                          <div className="p-3 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl shadow-lg">
+                            <Headphones className="w-5 h-5 text-white" />
+                          </div>
+                        ) : (
+                          <div className="p-3 bg-gradient-to-r from-green-500 to-green-600 rounded-xl shadow-lg">
+                            <User className="w-5 h-5 text-white" />
+                          </div>
+                        )}
+                      </div>
+                                
+                      <div className="flex-1 min-w-0">
+                        <div className={
+                          'rounded-2xl px-6 py-4 shadow-md border-l-4 transition-all duration-200 group-hover:shadow-lg ' +
+                          (step.actor === 'agent'
+                            ? 'bg-gradient-to-r from-blue-50 to-blue-100 border-blue-500 text-blue-900'
+                            : 'bg-gradient-to-r from-green-50 to-green-100 border-green-500 text-green-900')
+                        }>
+                          <div className="flex flex-col gap-2">
+                            <span className="font-bold text-sm uppercase tracking-wide opacity-75">
+                              {step.actor === 'agent' ? 'Agent' : 'Lead'}:
+                            </span>
+                            <div className="min-h-[24px]"> {/* Hauteur minimale pour éviter les sauts */}
+                              {processingSteps.includes(globalStepIdx) ? (
+                                <div className="flex items-center gap-3">
+                                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-current"></div>
+                                  <span className="text-sm font-medium">Updating response...</span>
+                                </div>
+                              ) : (
+                                <p className="leading-relaxed whitespace-pre-wrap">{step.replica}</p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                                
+                                {/* Edit options */}
+                                <div className="absolute right-0 top-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2">
+                                  {/* Direct edit */}
+                                  <button
+                                    onClick={() => setEditingStep({ index: globalStepIdx, text: step.replica })}
+                                    className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200"
+                                    title="Edit directly"
+                                  >
+                                    <Edit2 className="w-4 h-4" />
+                                  </button>
+                                  
+                                  {/* Refine with prompt */}
+                                  <button
+                                    onClick={() => setRefiningStep({ index: globalStepIdx, prompt: '' })}
+                                    className="p-2 text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all duration-200"
+                                    title="Refine with prompt"
+                                  >
+                                    <MessageSquare className="w-4 h-4" />
+                                  </button>
+                    </div>
+
+                                {/* Edit modal */}
+                                {editingStep?.index === globalStepIdx && (
+                                  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                                    <div className="bg-white rounded-xl p-6 max-w-2xl w-full max-h-[90vh] flex flex-col">
+                                      <h3 className="text-lg font-bold mb-4">Edit Response</h3>
+                                      <div className="flex-1 min-h-0 overflow-y-auto">
+                                        <textarea
+                                          value={editingStep.text}
+                                          onChange={e => setEditingStep({ ...editingStep, text: e.target.value })}
+                                          className="w-full h-full min-h-[200px] p-3 border-2 border-gray-200 rounded-lg mb-4 resize-none"
+                                        />
+                                      </div>
+                                      <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+                                        <button
+                                          onClick={() => setEditingStep(null)}
+                                          className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+                                        >
+                                          Cancel
+                                        </button>
+                                        <button
+                                          onClick={() => {
+                                            handleUpdateScriptContent(selectedScript._id, globalStepIdx, { replica: editingStep.text });
+                                            setEditingStep(null);
+                                          }}
+                                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                                        >
+                                          Save Changes
+                                        </button>
+                                      </div>
+                                    </div>
                                   </div>
-                                ) : (
-                                  <div className="p-3 bg-gradient-to-r from-green-500 to-green-600 rounded-xl shadow-lg">
-                                    <User className="w-5 h-5 text-white" />
+                                )}
+
+                                {/* Refine modal */}
+                                {refiningStep?.index === globalStepIdx && (
+                                  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                                    <div className="bg-white rounded-xl p-6 max-w-2xl w-full max-h-[90vh] flex flex-col">
+                                      <h3 className="text-lg font-bold mb-4">Refine Response</h3>
+                                      <div className="flex-1 min-h-0 overflow-y-auto">
+                                        <div className="mb-4 p-4 bg-gray-50 rounded-lg">
+                                          <p className="text-sm text-gray-600 mb-2">Current response:</p>
+                                          <p className="text-gray-800">{step.replica}</p>
+                                        </div>
+                                        <textarea
+                                          value={refiningStep.prompt}
+                                          onChange={e => setRefiningStep({ ...refiningStep, prompt: e.target.value })}
+                                          placeholder="Describe how you want to refine this response..."
+                                          className="w-full h-full min-h-[200px] p-3 border-2 border-gray-200 rounded-lg resize-none"
+                                        />
+                                      </div>
+                                      <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+                                        <button
+                                          onClick={() => setRefiningStep(null)}
+                                          className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+                                        >
+                                          Cancel
+                                        </button>
+                                        <button
+                                          onClick={() => {
+                                            handleRefineScriptPart(selectedScript._id, globalStepIdx, refiningStep.prompt);
+                                            setRefiningStep(null);
+                                          }}
+                                          className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                                        >
+                                          Refine Response
+                                        </button>
+                                      </div>
+                                    </div>
                                   </div>
                                 )}
                               </div>
-                              
-                              <div className="flex-1 min-w-0">
-                                <div className={
-                                  'rounded-2xl px-6 py-4 shadow-md border-l-4 transition-all duration-200 group-hover:shadow-lg ' +
-                                  (step.actor === 'agent'
-                                    ? 'bg-gradient-to-r from-blue-50 to-blue-100 border-blue-500 text-blue-900'
-                                    : 'bg-gradient-to-r from-green-50 to-green-100 border-green-500 text-green-900')
-                                }>
-                                  <div className="flex flex-col gap-2">
-                                    <span className="font-bold text-sm uppercase tracking-wide opacity-75">
-                                      {step.actor === 'agent' ? 'Agent' : 'Lead'}:
-                                    </span>
-                                    <p className="leading-relaxed">{step.replica}</p>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                     );
