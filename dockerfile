@@ -17,6 +17,7 @@ ENV VITE_API_URL_ONBOARDING=https://api-companysearchwizard.harx.ai/api
 ENV VITE_RUN_MODE=standalone
 ENV VITE_STANDALONE_USER_ID=6834946acf52e87c3ad15b39
 ENV VITE_STANDALONE_COMPANY_ID=683494e4641398dc582eca88
+ENV VITE_GIGS_API_URL=https://preprod-api-gigsmanual.harx.ai/api
 
 RUN npm run build
 
