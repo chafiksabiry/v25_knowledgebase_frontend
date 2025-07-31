@@ -568,15 +568,63 @@ const ScriptGenerator: React.FC = () => {
                 <div className="p-4 bg-gray-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
                   <Headphones className="w-8 h-8 text-gray-400" />
                 </div>
-                <h4 className="text-lg font-medium text-gray-700 mb-2">No scripts yet</h4>
-                <p className="text-gray-500 mb-6">Create your first call script to get started</p>
-                <button
-                  className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2 font-medium mx-auto"
-                  onClick={handleShowFormClick}
-                >
-                  <Plus className="w-5 h-5" />
-                  Generate Your First Script
-                </button>
+                
+                {/* Different messages based on the current filter */}
+                {statusFilter === 'all' ? (
+                  <>
+                    <h4 className="text-lg font-medium text-gray-700 mb-2">No scripts yet</h4>
+                    <p className="text-gray-500 mb-6">Create your first call script to get started</p>
+                    <button
+                      className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2 font-medium mx-auto"
+                      onClick={handleShowFormClick}
+                    >
+                      <Plus className="w-5 h-5" />
+                      Generate Your First Script
+                    </button>
+                  </>
+                ) : statusFilter === 'active' ? (
+                  <>
+                    <h4 className="text-lg font-medium text-gray-700 mb-2">No active scripts</h4>
+                    <p className="text-gray-500 mb-6">All your scripts are currently inactive. You can activate them or create new ones.</p>
+                    <div className="space-y-3">
+                      <button
+                        className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2 font-medium mx-auto"
+                        onClick={handleShowFormClick}
+                      >
+                        <Plus className="w-5 h-5" />
+                        Create New Script
+                      </button>
+                      <button
+                        className="px-6 py-3 bg-white text-gray-700 border-2 border-gray-200 rounded-xl hover:bg-gray-50 hover:border-gray-300 shadow-md hover:shadow-lg transition-all duration-200 flex items-center gap-2 font-medium mx-auto"
+                        onClick={() => setStatusFilter('all')}
+                      >
+                        <Filter className="w-5 h-5" />
+                        View All Scripts
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <h4 className="text-lg font-medium text-gray-700 mb-2">No inactive scripts</h4>
+                    <p className="text-gray-500 mb-6">All your scripts are currently active. Great job keeping your scripts organized!</p>
+                    <div className="space-y-3">
+                      <button
+                        className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2 font-medium mx-auto"
+                        onClick={handleShowFormClick}
+                      >
+                        <Plus className="w-5 h-5" />
+                        Create New Script
+                      </button>
+                      <button
+                        className="px-6 py-3 bg-white text-gray-700 border-2 border-gray-200 rounded-xl hover:bg-gray-50 hover:border-gray-300 shadow-md hover:shadow-lg transition-all duration-200 flex items-center gap-2 font-medium mx-auto"
+                        onClick={() => setStatusFilter('all')}
+                      >
+                        <Filter className="w-5 h-5" />
+                        View All Scripts
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             ) : (
               <div className="overflow-x-auto">
