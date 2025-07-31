@@ -159,7 +159,7 @@ const REPS_PHASES = [
     color: 'text-purple-600',
     bgColor: 'bg-purple-50',
     borderColor: 'border-purple-200',
-    description: 'Préparation et mise en contexte'
+    description: 'Preparation and context setting'
   },
   {
     name: 'SBAM & Opening',
@@ -175,7 +175,7 @@ const REPS_PHASES = [
     color: 'text-red-600',
     bgColor: 'bg-red-50',
     borderColor: 'border-red-200',
-    description: 'Aspects légaux et conformité'
+    description: 'Legal aspects and compliance'
   },
   {
     name: 'Need Discovery',
@@ -183,7 +183,7 @@ const REPS_PHASES = [
     color: 'text-orange-600',
     bgColor: 'bg-orange-50',
     borderColor: 'border-orange-200',
-    description: 'Découverte des besoins'
+    description: 'Needs discovery and qualification'
   },
   {
     name: 'Value Proposition',
@@ -191,7 +191,7 @@ const REPS_PHASES = [
     color: 'text-yellow-600',
     bgColor: 'bg-yellow-50',
     borderColor: 'border-yellow-200',
-    description: 'Proposition de valeur'
+    description: 'Value proposition presentation'
   },
   {
     name: 'Documents/Quote',
@@ -199,7 +199,7 @@ const REPS_PHASES = [
     color: 'text-indigo-600',
     bgColor: 'bg-indigo-50',
     borderColor: 'border-indigo-200',
-    description: 'Documentation et devis'
+    description: 'Documentation and quotation'
   },
   {
     name: 'Objection Handling',
@@ -207,7 +207,7 @@ const REPS_PHASES = [
     color: 'text-pink-600',
     bgColor: 'bg-pink-50',
     borderColor: 'border-pink-200',
-    description: 'Traitement des objections'
+    description: 'Objection handling and resolution'
   },
   {
     name: 'Confirmation & Closing',
@@ -215,7 +215,7 @@ const REPS_PHASES = [
     color: 'text-green-600',
     bgColor: 'bg-green-50',
     borderColor: 'border-green-200',
-    description: 'Confirmation et clôture'
+    description: 'Confirmation and closing'
   }
 ];
 
