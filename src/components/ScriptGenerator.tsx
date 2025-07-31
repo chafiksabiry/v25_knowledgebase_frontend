@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import apiClient from '../api/client';
 import Cookies from 'js-cookie';
-import { User, Headphones, Plus, ArrowLeft, Eye, Calendar, Target, Globe, Trash2, ToggleLeft, ToggleRight, Filter } from 'lucide-react';
+import { 
+  User, Headphones, Plus, ArrowLeft, Eye, Calendar, Target, Globe, Trash2, ToggleLeft, ToggleRight, Filter,
+  FileText, HandHeart, Shield, Search, Star, FileCheck, AlertTriangle, CheckCircle
+} from 'lucide-react';
 
 interface ScriptResponse {
   success: boolean;
@@ -147,6 +150,107 @@ interface Script {
   createdAt: string;
   gig?: Gig;
 }
+
+// REPS Call Phases configuration
+const REPS_PHASES = [
+  {
+    name: 'Context & Preparation',
+    icon: FileText,
+    color: 'text-purple-600',
+    bgColor: 'bg-purple-50',
+    borderColor: 'border-purple-200',
+    description: 'Préparation et mise en contexte'
+  },
+  {
+    name: 'SBAM & Opening',
+    icon: HandHeart,
+    color: 'text-blue-600',
+    bgColor: 'bg-blue-50',
+    borderColor: 'border-blue-200',
+    description: 'Salutation, Bonjour, Accroche, Motif'
+  },
+  {
+    name: 'Legal & Compliance',
+    icon: Shield,
+    color: 'text-red-600',
+    bgColor: 'bg-red-50',
+    borderColor: 'border-red-200',
+    description: 'Aspects légaux et conformité'
+  },
+  {
+    name: 'Need Discovery',
+    icon: Search,
+    color: 'text-orange-600',
+    bgColor: 'bg-orange-50',
+    borderColor: 'border-orange-200',
+    description: 'Découverte des besoins'
+  },
+  {
+    name: 'Value Proposition',
+    icon: Star,
+    color: 'text-yellow-600',
+    bgColor: 'bg-yellow-50',
+    borderColor: 'border-yellow-200',
+    description: 'Proposition de valeur'
+  },
+  {
+    name: 'Documents/Quote',
+    icon: FileCheck,
+    color: 'text-indigo-600',
+    bgColor: 'bg-indigo-50',
+    borderColor: 'border-indigo-200',
+    description: 'Documentation et devis'
+  },
+  {
+    name: 'Objection Handling',
+    icon: AlertTriangle,
+    color: 'text-pink-600',
+    bgColor: 'bg-pink-50',
+    borderColor: 'border-pink-200',
+    description: 'Traitement des objections'
+  },
+  {
+    name: 'Confirmation & Closing',
+    icon: CheckCircle,
+    color: 'text-green-600',
+    bgColor: 'bg-green-50',
+    borderColor: 'border-green-200',
+    description: 'Confirmation et clôture'
+  }
+];
+
+// Helper function to get phase configuration
+const getPhaseConfig = (phaseName: string) => {
+  return REPS_PHASES.find(phase => phase.name === phaseName) || {
+    name: phaseName,
+    icon: Target,
+    color: 'text-gray-600',
+    bgColor: 'bg-gray-50',
+    borderColor: 'border-gray-200',
+    description: phaseName
+  };
+};
+
+// Helper function to group script steps by phase
+const groupScriptByPhase = (script: { phase: string; actor: string; replica: string }[]) => {
+  const grouped: { [key: string]: { phase: string; actor: string; replica: string }[] } = {};
+  
+  script.forEach(step => {
+    if (!grouped[step.phase]) {
+      grouped[step.phase] = [];
+    }
+    grouped[step.phase].push(step);
+  });
+  
+  // Sort phases according to REPS order
+  const sortedPhases = REPS_PHASES.map(phase => phase.name).filter(phaseName => grouped[phaseName]);
+  const otherPhases = Object.keys(grouped).filter(phaseName => !REPS_PHASES.some(phase => phase.name === phaseName));
+  
+  return [...sortedPhases, ...otherPhases].map(phaseName => ({
+    phaseName,
+    steps: grouped[phaseName]
+  }));
+};
 
 const ScriptGenerator: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -652,8 +756,13 @@ const ScriptGenerator: React.FC = () => {
                               <div className="p-2 bg-blue-100 rounded-lg group-hover:bg-blue-200 transition-colors">
                                 <Target className="w-4 h-4 text-blue-600" />
                               </div>
-                              <div>
-                                <p className="font-semibold text-gray-800">{gig?.title || 'Untitled Gig'}</p>
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <p className="font-semibold text-gray-800">{gig?.title || 'Untitled Gig'}</p>
+                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
+                                    REPS
+                                  </span>
+                                </div>
                                 <p className="text-sm text-gray-500">{gig?.category || script.gigId}</p>
                               </div>
                             </div>
@@ -752,13 +861,28 @@ const ScriptGenerator: React.FC = () => {
         {view === 'script' && selectedScript && (
           <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden animate-fade-in">
             <div className="p-6 bg-gradient-to-r from-blue-600 to-purple-600 text-white">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-white/20 rounded-xl">
-                  <Headphones className="w-8 h-8" />
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-white/20 rounded-xl">
+                    <Headphones className="w-8 h-8" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-3 mb-1">
+                      <h3 className="text-2xl font-bold">Call Script</h3>
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-white/20 text-white border border-white/30">
+                        REPS Methodology
+                      </span>
+                    </div>
+                    <p className="text-blue-100">Ready to use conversation guide with structured phases</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-2xl font-bold">Call Script</h3>
-                  <p className="text-blue-100">Ready to use conversation guide</p>
+                
+                {/* Phase count indicator */}
+                <div className="text-right">
+                  <div className="text-sm text-blue-100">Script Phases</div>
+                  <div className="text-2xl font-bold">
+                    {groupScriptByPhase(selectedScript.script).length}
+                  </div>
                 </div>
               </div>
             </div>
@@ -815,43 +939,76 @@ const ScriptGenerator: React.FC = () => {
             </div>
 
             <div className="p-6">
-              <div className="space-y-6">
+              <div className="space-y-8">
                 {Array.isArray(selectedScript.script) && selectedScript.script.length > 0 ? (
-                  selectedScript.script.map((step, idx) => (
-                    <div key={idx} className="flex items-start gap-4 group">
-                      <div className="flex-shrink-0 mt-1">
-                        {step.actor === 'agent' ? (
-                          <div className="p-3 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl shadow-lg">
-                            <Headphones className="w-5 h-5 text-white" />
-                          </div>
-                        ) : (
-                          <div className="p-3 bg-gradient-to-r from-green-500 to-green-600 rounded-xl shadow-lg">
-                            <User className="w-5 h-5 text-white" />
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="mb-2">
-                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wide bg-gray-100 text-gray-600">
-                            {step.phase}
-                          </span>
-                        </div>
-                        <div className={
-                          'rounded-2xl px-6 py-4 shadow-md border-l-4 transition-all duration-200 group-hover:shadow-lg ' +
-                          (step.actor === 'agent'
-                            ? 'bg-gradient-to-r from-blue-50 to-blue-100 border-blue-500 text-blue-900'
-                            : 'bg-gradient-to-r from-green-50 to-green-100 border-green-500 text-green-900')
-                        }>
-                          <div className="flex flex-col gap-2">
-                            <span className="font-bold text-sm uppercase tracking-wide opacity-75">
-                              {step.actor === 'agent' ? 'Agent' : 'Lead'}:
-                            </span>
-                            <p className="leading-relaxed ml-0">{step.replica}</p>
+                  groupScriptByPhase(selectedScript.script).map((phaseGroup, phaseIdx) => {
+                    const phaseConfig = getPhaseConfig(phaseGroup.phaseName);
+                    const PhaseIcon = phaseConfig.icon;
+                    
+                    return (
+                      <div key={phaseIdx} className="relative">
+                        {/* Phase Header */}
+                        <div className={`mb-6 p-4 rounded-xl border-2 ${phaseConfig.bgColor} ${phaseConfig.borderColor} shadow-sm`}>
+                          <div className="flex items-center gap-3">
+                            <div className={`p-3 bg-white rounded-lg shadow-md ${phaseConfig.color}`}>
+                              <PhaseIcon className="w-6 h-6" />
+                            </div>
+                            <div>
+                              <h4 className={`text-lg font-bold ${phaseConfig.color}`}>
+                                {phaseGroup.phaseName}
+                              </h4>
+                              <p className="text-sm text-gray-600 mt-1">
+                                {phaseConfig.description}
+                              </p>
+                            </div>
+                            <div className="ml-auto">
+                              <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${phaseConfig.bgColor} ${phaseConfig.color} border ${phaseConfig.borderColor}`}>
+                                Phase {REPS_PHASES.findIndex(p => p.name === phaseGroup.phaseName) + 1 || '?'}
+                              </span>
+                            </div>
                           </div>
                         </div>
+
+                        {/* Phase Steps */}
+                        <div className="space-y-4 ml-4 border-l-2 border-gray-200 pl-6 relative">
+                          {phaseGroup.steps.map((step, stepIdx) => (
+                            <div key={stepIdx} className="flex items-start gap-4 group relative">
+                              {/* Connection line dot */}
+                              <div className={`absolute -left-7 top-4 w-3 h-3 rounded-full border-2 border-white shadow-sm ${phaseConfig.bgColor} ${phaseConfig.borderColor}`}></div>
+                              
+                              <div className="flex-shrink-0">
+                                {step.actor === 'agent' ? (
+                                  <div className="p-3 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl shadow-lg">
+                                    <Headphones className="w-5 h-5 text-white" />
+                                  </div>
+                                ) : (
+                                  <div className="p-3 bg-gradient-to-r from-green-500 to-green-600 rounded-xl shadow-lg">
+                                    <User className="w-5 h-5 text-white" />
+                                  </div>
+                                )}
+                              </div>
+                              
+                              <div className="flex-1 min-w-0">
+                                <div className={
+                                  'rounded-2xl px-6 py-4 shadow-md border-l-4 transition-all duration-200 group-hover:shadow-lg ' +
+                                  (step.actor === 'agent'
+                                    ? 'bg-gradient-to-r from-blue-50 to-blue-100 border-blue-500 text-blue-900'
+                                    : 'bg-gradient-to-r from-green-50 to-green-100 border-green-500 text-green-900')
+                                }>
+                                  <div className="flex flex-col gap-2">
+                                    <span className="font-bold text-sm uppercase tracking-wide opacity-75">
+                                      {step.actor === 'agent' ? 'Agent' : 'Lead'}:
+                                    </span>
+                                    <p className="leading-relaxed">{step.replica}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  ))
+                    );
+                  })
                 ) : (
                   <div className="text-center py-12">
                     <div className="p-4 bg-gray-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
@@ -881,6 +1038,32 @@ const ScriptGenerator: React.FC = () => {
             </div>
 
             <form onSubmit={handleSubmit} className="p-8 space-y-6">
+              {/* REPS Methodology Info */}
+              <div className="mb-8 p-6 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-xl">
+                <h4 className="text-lg font-bold text-purple-800 mb-2 flex items-center gap-2">
+                  <Target className="w-5 h-5" />
+                  REPS Call Methodology
+                </h4>
+                <p className="text-purple-700 mb-4">Your script will be generated following the proven REPS methodology with these 8 structured phases:</p>
+                
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {REPS_PHASES.map((phase, idx) => {
+                    const PhaseIcon = phase.icon;
+                    return (
+                      <div key={idx} className={`p-3 rounded-lg border ${phase.bgColor} ${phase.borderColor} transition-all duration-200 hover:shadow-md`}>
+                        <div className="flex items-center gap-2 mb-1">
+                          <PhaseIcon className={`w-4 h-4 ${phase.color}`} />
+                          <span className="text-xs font-bold text-gray-600">Phase {idx + 1}</span>
+                        </div>
+                        <p className={`text-xs font-semibold ${phase.color} leading-tight`}>
+                          {phase.name}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
               <div className="grid md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
