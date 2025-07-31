@@ -759,9 +759,6 @@ const ScriptGenerator: React.FC = () => {
                               <div className="flex-1">
                                 <div className="flex items-center gap-2">
                                   <p className="font-semibold text-gray-800">{gig?.title || 'Untitled Gig'}</p>
-                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
-                                    REPS
-                                  </span>
                                 </div>
                                 <p className="text-sm text-gray-500">{gig?.category || script.gigId}</p>
                               </div>
@@ -870,7 +867,7 @@ const ScriptGenerator: React.FC = () => {
                     <div className="flex items-center gap-3 mb-1">
                       <h3 className="text-2xl font-bold">Call Script</h3>
                       <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-white/20 text-white border border-white/30">
-                        REPS Methodology
+                        Structured Call
                       </span>
                     </div>
                     <p className="text-blue-100">Ready to use conversation guide with structured phases</p>
@@ -961,11 +958,6 @@ const ScriptGenerator: React.FC = () => {
                                 {phaseConfig.description}
                               </p>
                             </div>
-                            <div className="ml-auto">
-                              <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${phaseConfig.bgColor} ${phaseConfig.color} border ${phaseConfig.borderColor}`}>
-                                Phase {REPS_PHASES.findIndex(p => p.name === phaseGroup.phaseName) + 1 || '?'}
-                              </span>
-                            </div>
                           </div>
                         </div>
 
@@ -1038,26 +1030,25 @@ const ScriptGenerator: React.FC = () => {
             </div>
 
             <form onSubmit={handleSubmit} className="p-8 space-y-6">
-              {/* REPS Methodology Info */}
+              {/* Script Structure Info */}
               <div className="mb-8 p-6 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-xl">
                 <h4 className="text-lg font-bold text-purple-800 mb-2 flex items-center gap-2">
                   <Target className="w-5 h-5" />
-                  REPS Call Methodology
+                  Structured Call Script
                 </h4>
-                <p className="text-purple-700 mb-4">Your script will be generated following the proven REPS methodology with these 8 structured phases:</p>
+                <p className="text-purple-700 mb-4">Your script will be generated following a proven methodology with these key phases:</p>
                 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   {REPS_PHASES.map((phase, idx) => {
                     const PhaseIcon = phase.icon;
                     return (
                       <div key={idx} className={`p-3 rounded-lg border ${phase.bgColor} ${phase.borderColor} transition-all duration-200 hover:shadow-md`}>
-                        <div className="flex items-center gap-2 mb-1">
+                        <div className="flex items-center gap-2">
                           <PhaseIcon className={`w-4 h-4 ${phase.color}`} />
-                          <span className="text-xs font-bold text-gray-600">Phase {idx + 1}</span>
+                          <p className={`text-xs font-semibold ${phase.color} leading-tight`}>
+                            {phase.name}
+                          </p>
                         </div>
-                        <p className={`text-xs font-semibold ${phase.color} leading-tight`}>
-                          {phase.name}
-                        </p>
                       </div>
                     );
                   })}
