@@ -23,11 +23,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, fallback }) =
   // Construire l'URL complète pour l'app principale
   const getMainAppUrl = () => {
     if (fallback) return fallback;
-    const orchestratorUrl = import.meta.env.VITE_COMPANY_ORCHESTRATOR_URL;
-    if (orchestratorUrl && orchestratorUrl !== '/app11') {
-      return `${window.location.protocol}//${window.location.host}${orchestratorUrl}`;
-    }
-    return `${window.location.protocol}//${window.location.host}/app11`;
+    // Toujours rediriger vers /app1 pour l'authentification (cohérent avec AuthContext)
+    return `${window.location.protocol}//${window.location.host}/app1`;
   };
 
   // Nettoyer l'historique du navigateur pour les pages protégées
