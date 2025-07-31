@@ -277,6 +277,9 @@ const ScriptGenerator: React.FC = () => {
   // Add new state for tracking processing steps
   const [processingSteps, setProcessingSteps] = useState<number[]>([]);
 
+  // Add new state for managing phase additions
+  const [addingReplicaToPhase, setAddingReplicaToPhase] = useState<string | null>(null);
+
   const getCompanyId = () => {
     const runMode = import.meta.env.VITE_RUN_MODE || 'in-app';
     if (runMode === 'standalone') {
@@ -671,6 +674,9 @@ const ScriptGenerator: React.FC = () => {
 
   const handleUpdateScriptContent = async (scriptId: string, stepIndex: number, newContent: { replica: string }) => {
     try {
+      // Si le texte est vide, utiliser un espace pour satisfaire la validation
+      const replicaText = newContent.replica.trim() === '' ? ' ' : newContent.replica;
+      
       // Mettre à jour l'état avant la requête
       setProcessingSteps(prev => [...prev, stepIndex]);
       
@@ -685,7 +691,10 @@ const ScriptGenerator: React.FC = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ stepIndex, newContent }),
+        body: JSON.stringify({ 
+          stepIndex, 
+          newContent: { replica: replicaText }
+        }),
       });
 
       if (!response.ok) {
@@ -714,6 +723,103 @@ const ScriptGenerator: React.FC = () => {
       alert(`Failed to update script content: ${err.message}`);
     } finally {
       setProcessingSteps(prev => prev.filter(id => id !== stepIndex));
+    }
+  };
+
+  // Add new handlers for replica management
+  const handleAddReplica = async (scriptId: string, phase: string, actor: string) => {
+    try {
+      const backendUrl = import.meta.env.VITE_BACKEND_API;
+      if (!backendUrl) throw new Error('Backend API URL not configured');
+      
+      // Find the index where to insert the new replica
+      const phaseSteps = selectedScript?.script.filter(s => s.phase === phase) || [];
+      const lastPhaseStepIndex = selectedScript?.script.findIndex(s => s.phase === phase && s.replica === phaseSteps[phaseSteps.length - 1].replica);
+      const insertIndex = lastPhaseStepIndex !== undefined ? lastPhaseStepIndex + 1 : selectedScript?.script.length || 0;
+
+      // Use the new dedicated endpoint
+      const response = await fetch(`${backendUrl}/api/scripts/${scriptId}/replicas`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          phase,
+          actor,
+          insertIndex
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to add replica: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      // Update local state
+      setScripts(prevScripts => 
+        prevScripts.map(script => 
+          script._id === scriptId 
+            ? data.data.fullScript
+            : script
+        )
+      );
+
+      if (selectedScript?._id === scriptId) {
+        setSelectedScript(data.data.fullScript);
+      }
+
+      // Start editing the new replica immediately
+      setEditingStep({ 
+        index: data.data.insertedIndex,
+        text: '' // Start with empty text in the editor
+      });
+
+    } catch (err: any) {
+      console.error('[SCRIPTS] Error adding replica:', err);
+      alert(`Failed to add replica: ${err.message}`);
+    }
+  };
+
+  const handleDeleteReplica = async (scriptId: string, stepIndex: number) => {
+    if (!confirm('Are you sure you want to delete this replica? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const backendUrl = import.meta.env.VITE_BACKEND_API;
+      if (!backendUrl) throw new Error('Backend API URL not configured');
+      
+      // Use the new dedicated endpoint
+      const response = await fetch(`${backendUrl}/api/scripts/${scriptId}/replicas/${stepIndex}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to delete replica: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      // Update local state
+      setScripts(prevScripts => 
+        prevScripts.map(script => 
+          script._id === scriptId 
+            ? data.data.fullScript
+            : script
+        )
+      );
+
+      if (selectedScript?._id === scriptId) {
+        setSelectedScript(data.data.fullScript);
+      }
+
+    } catch (err: any) {
+      console.error('[SCRIPTS] Error deleting replica:', err);
+      alert(`Failed to delete replica: ${err.message}`);
     }
   };
 
@@ -1124,17 +1230,37 @@ const ScriptGenerator: React.FC = () => {
                       <div key={phaseIdx} className="relative">
                         {/* Phase Header */}
                         <div className={`mb-6 p-4 rounded-xl border-2 ${phaseConfig.bgColor} ${phaseConfig.borderColor} shadow-sm`}>
-                          <div className="flex items-center gap-3">
-                            <div className={`p-3 bg-white rounded-lg shadow-md ${phaseConfig.color}`}>
-                              <PhaseIcon className="w-6 h-6" />
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className={`p-3 bg-white rounded-lg shadow-md ${phaseConfig.color}`}>
+                                <PhaseIcon className="w-6 h-6" />
+                              </div>
+                              <div>
+                                <h4 className={`text-lg font-bold ${phaseConfig.color}`}>
+                                  {phaseGroup.phaseName}
+                                </h4>
+                                <p className="text-sm text-gray-600 mt-1">
+                                  {phaseConfig.description}
+                                </p>
+                              </div>
                             </div>
-                            <div>
-                              <h4 className={`text-lg font-bold ${phaseConfig.color}`}>
-                                {phaseGroup.phaseName}
-                              </h4>
-                              <p className="text-sm text-gray-600 mt-1">
-                                {phaseConfig.description}
-                              </p>
+                            
+                            {/* Add Replica Buttons */}
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => handleAddReplica(selectedScript._id, phaseGroup.phaseName, 'agent')}
+                                className="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors flex items-center gap-1"
+                              >
+                                <Plus className="w-4 h-4" />
+                                Add Agent Response
+                              </button>
+                              <button
+                                onClick={() => handleAddReplica(selectedScript._id, phaseGroup.phaseName, 'lead')}
+                                className="px-3 py-1 text-sm bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors flex items-center gap-1"
+                              >
+                                <Plus className="w-4 h-4" />
+                                Add Lead Response
+                              </button>
                             </div>
                           </div>
                         </div>
@@ -1190,6 +1316,15 @@ const ScriptGenerator: React.FC = () => {
                                 
                                 {/* Edit options */}
                                 <div className="absolute right-0 top-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2">
+                                  {/* Delete button */}
+                                  <button
+                                    onClick={() => handleDeleteReplica(selectedScript._id, globalStepIdx)}
+                                    className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200"
+                                    title="Delete replica"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                  
                                   {/* Direct edit */}
                                   <button
                                     onClick={() => setEditingStep({ index: globalStepIdx, text: step.replica })}
