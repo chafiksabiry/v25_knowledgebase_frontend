@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import Cookies from 'js-cookie';
-import Sidebar from './components/Sidebar';
+import { AuthProvider } from './contexts/AuthContext';
 import Header from './components/Header';
+import ProtectedRoute from './components/ProtectedRoute';
 import Dashboard from './components/Dashboard';
 import ContactsList from './components/ContactsList';
 import AISearch from './components/AISearch';
@@ -15,8 +15,6 @@ import AugmentedLearning from './components/AugmentedLearning';
 import CompanyManagement from './components/CompanyManagement';
 import UserManagement from './components/UserManagement';
 import PermissionsManagement from './components/PermissionsManagement';
-import ProtectedRoute from './components/ProtectedRoute';
-import { OnboardingProgress } from './types/onboarding';
 import ScriptGenerator from './components/ScriptGenerator';
 
 // ⬇️ Ajoute le qiankun helper
@@ -24,77 +22,120 @@ import { qiankunWindow } from 'vite-plugin-qiankun/dist/helper';
 
 function App() {
   const isStandaloneMode = import.meta.env.VITE_RUN_MODE === 'standalone';
-  const isInAppMode = import.meta.env.VITE_RUN_MODE === 'in-app';
   const basename = isStandaloneMode ? '/' : '/knowledgebase';
-  const [progress, setProgress] = useState<OnboardingProgress | null>(null);
-
-  useEffect(() => {
-    // Only fetch and set progress if in in-app mode
-    if (isInAppMode) {
-      try {
-        const progressData = Cookies.get('companyOnboardingProgress');
-        if (progressData) {
-          const parsedProgress = JSON.parse(progressData);
-          setProgress(parsedProgress);
-          console.log('Loaded onboarding progress:', parsedProgress);
-        }
-      } catch (error) {
-        console.error('Error loading onboarding progress:', error);
-      }
-    }
-  }, [isInAppMode]);
 
   return (
-    <Router basename={basename}>
-      <div className="flex h-screen bg-gray-50">
-        <Sidebar progress={isInAppMode ? progress : null} />
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <Header onboardingProgress={isInAppMode ? progress : null} />
-          <main className="flex-1 overflow-y-auto">
-            <Routes>
-              <Route path="/upload" element={<KnowledgeBase />} />
-              <Route path="/" element={<ProtectedRoute element={<Dashboard />} />} />
-              <Route path="/app9" element={<ProtectedRoute element={<Dashboard />} />} />
-              <Route path="/contacts" element={<ProtectedRoute element={<ContactsList />} />} />
-              <Route path="/search" element={<ProtectedRoute element={<AISearch />} />} />
-              <Route path="/insights" element={<ProtectedRoute element={<AIInsights />} />} />
-              <Route path="/knowledge-insights" element={<ProtectedRoute element={<KnowledgeInsights />} />} />
-              <Route path="/knowledge-query" element={<ProtectedRoute element={<KnowledgeQuery />} />} />
-              <Route path="/assistant" element={<ProtectedRoute element={<AIAssistant />} />} />
-              <Route path="/augmented-learning" element={<ProtectedRoute element={<AugmentedLearning />} />} />
-              <Route path="/companies" element={<ProtectedRoute element={<CompanyManagement />} />} />
-              <Route path="/users" element={<ProtectedRoute element={<UserManagement />} />} />
-              <Route path="/permissions" element={<ProtectedRoute element={<PermissionsManagement />} />} />
-              <Route path="/tags" element={
-                <ProtectedRoute element={
-                  <div className="p-6">
-                    <h1 className="text-2xl font-bold">Tags Management</h1>
-                    <p className="mt-4">This feature is coming soon.</p>
-                  </div>
+    <AuthProvider>
+      <Router basename={basename}>
+        <div className="flex flex-col h-screen bg-gray-50">
+          {/* Header avec logo et logout */}
+          <Header />
+          
+          {/* Contenu principal */}
+          <div className="flex-1 overflow-hidden">
+            <main className="h-full overflow-y-auto">
+              <Routes>
+                {/* Routes protégées */}
+                <Route path="/upload" element={
+                  <ProtectedRoute>
+                    <KnowledgeBase />
+                  </ProtectedRoute>
                 } />
-              } />
-              <Route path="/analytics" element={
-                <ProtectedRoute element={
-                  <div className="p-6">
-                    <h1 className="text-2xl font-bold">Analytics</h1>
-                    <p className="mt-4">This feature is coming soon.</p>
-                  </div>
+                <Route path="/" element={
+                  <ProtectedRoute>
+                    <Dashboard />
+                  </ProtectedRoute>
                 } />
-              } />
-              <Route path="/settings" element={
-                <ProtectedRoute element={
-                  <div className="p-6">
-                    <h1 className="text-2xl font-bold">Settings</h1>
-                    <p className="mt-4">This feature is coming soon.</p>
-                  </div>
+                <Route path="/app9" element={
+                  <ProtectedRoute>
+                    <Dashboard />
+                  </ProtectedRoute>
                 } />
-              } />
-              <Route path="/script-generator" element={<ProtectedRoute element={<ScriptGenerator />} />} />
-            </Routes>
-          </main>
+                <Route path="/contacts" element={
+                  <ProtectedRoute>
+                    <ContactsList />
+                  </ProtectedRoute>
+                } />
+                <Route path="/search" element={
+                  <ProtectedRoute>
+                    <AISearch />
+                  </ProtectedRoute>
+                } />
+                <Route path="/insights" element={
+                  <ProtectedRoute>
+                    <AIInsights />
+                  </ProtectedRoute>
+                } />
+                <Route path="/knowledge-insights" element={
+                  <ProtectedRoute>
+                    <KnowledgeInsights />
+                  </ProtectedRoute>
+                } />
+                <Route path="/knowledge-query" element={
+                  <ProtectedRoute>
+                    <KnowledgeQuery />
+                  </ProtectedRoute>
+                } />
+                <Route path="/assistant" element={
+                  <ProtectedRoute>
+                    <AIAssistant />
+                  </ProtectedRoute>
+                } />
+                <Route path="/augmented-learning" element={
+                  <ProtectedRoute>
+                    <AugmentedLearning />
+                  </ProtectedRoute>
+                } />
+                <Route path="/companies" element={
+                  <ProtectedRoute>
+                    <CompanyManagement />
+                  </ProtectedRoute>
+                } />
+                <Route path="/users" element={
+                  <ProtectedRoute>
+                    <UserManagement />
+                  </ProtectedRoute>
+                } />
+                <Route path="/permissions" element={
+                  <ProtectedRoute>
+                    <PermissionsManagement />
+                  </ProtectedRoute>
+                } />
+                <Route path="/tags" element={
+                  <ProtectedRoute>
+                    <div className="p-6">
+                      <h1 className="text-2xl font-bold">Tags Management</h1>
+                      <p className="mt-4">This feature is coming soon.</p>
+                    </div>
+                  </ProtectedRoute>
+                } />
+                <Route path="/analytics" element={
+                  <ProtectedRoute>
+                    <div className="p-6">
+                      <h1 className="text-2xl font-bold">Analytics</h1>
+                      <p className="mt-4">This feature is coming soon.</p>
+                    </div>
+                  </ProtectedRoute>
+                } />
+                <Route path="/settings" element={
+                  <ProtectedRoute>
+                    <div className="p-6">
+                      <h1 className="text-2xl font-bold">Settings</h1>
+                      <p className="mt-4">This feature is coming soon.</p>
+                    </div>
+                  </ProtectedRoute>
+                } />
+                <Route path="/script-generator" element={
+                  <ProtectedRoute>
+                    <ScriptGenerator />
+                  </ProtectedRoute>
+                } />
+              </Routes>
+            </main>
+          </div>
         </div>
-      </div>
-    </Router>
+      </Router>
+    </AuthProvider>
   );
 }
 
