@@ -20,7 +20,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
 
   return {
-    base: 'http://localhost:5184/',
+    base: 'https://knowledge-base.harx.ai/',
     plugins: [
       react({
         jsxRuntime: 'classic',
