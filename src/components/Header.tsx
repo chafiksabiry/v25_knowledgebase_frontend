@@ -5,8 +5,10 @@ import { useAuth } from '../contexts/AuthContext';
 const Header: React.FC = () => {
   const { logout } = useAuth();
   // Utilisation de VITE_FRONT_URL pour le logo
-  const frontUrl = import.meta.env.VITE_FRONT_URL;
-  const logoUrl = `${frontUrl}logo_harx.jpg`;
+  const frontUrl = import.meta.env.VITE_FRONT_URL || 'https://harxv25knowledgebasefrontend.netlify.app/';
+  // Ensure frontUrl ends with / before concatenating
+  const baseUrl = frontUrl.endsWith('/') ? frontUrl : `${frontUrl}/`;
+  const logoUrl = `${baseUrl}logo_harx.jpg`;
 
   const handleLogout = () => {
     logout();
@@ -17,9 +19,9 @@ const Header: React.FC = () => {
       <div className="flex items-center justify-between">
         {/* Logo */}
         <div className="flex items-center">
-          <img 
-            src={logoUrl} 
-            alt="Harx Logo" 
+          <img
+            src={logoUrl}
+            alt="Harx Logo"
             className="h-8 w-auto"
             onError={(e) => {
               // Fallback si l'image ne charge pas

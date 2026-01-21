@@ -73,7 +73,6 @@ if (!qiankunWindow.__POWERED_BY_QIANKUN__) {
   console.log('[App9] Running in standalone mode');
   render({});
 } else {
-  console.log('[App9] Running inside Qiankun');
-  // Qiankun will control the lifecycle
-  render({});
+  console.log('[App9] Running inside Qiankun - waiting for mount() to be called');
+  // Qiankun will control the lifecycle - do NOT render here
 }
