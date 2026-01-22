@@ -1,14 +1,7 @@
 import React, { useState } from 'react';
-import { Search, Send, Loader2, FileText, Phone } from 'lucide-react';
+import { Search, Send, Loader2 } from 'lucide-react';
 import apiClient from '../api/client';
-import Cookies from 'js-cookie';
-
-interface CorpusStatus {
-  exists: boolean;
-  documentCount: number;
-  callRecordingCount: number;
-  totalCount: number;
-}
+import { jwtDecode } from 'jwt-decode';
 
 interface QueryResponse {
   success: boolean;
@@ -17,7 +10,10 @@ interface QueryResponse {
     metadata: {
       processedAt: string;
       model: string;
-      corpusStatus: CorpusStatus;
+      corpusStatus: {
+        wasUpdated: boolean;
+        documentCount: number;
+      };
     };
   };
   error?: {
@@ -33,24 +29,20 @@ const KnowledgeQuery: React.FC = () => {
   const [response, setResponse] = useState<QueryResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Get userId from cookies
-  const getUserId = () => {
-    const runMode = import.meta.env.VITE_RUN_MODE || 'in-app';
-    let userId;
-    // Determine userId based on run mode
-    if (runMode === 'standalone') {
-      console.log("Running in standalone mode");
-      // Use static userId from environment variable in standalone mode
-      userId = import.meta.env.VITE_STANDALONE_USER_ID;
-      console.log("Using static userID from env:", userId);
-    } else {
-      console.log("Running in in-app mode");
-      // Use userId from cookies in in-app mode
-      userId = Cookies.get('userId');
-      console.log("userId cookie:", userId);
-      console.log("Verified saved user ID from cookie:", userId);
+  // Get companyId from JWT
+  const getCompanyIdFromToken = () => {
+    const token = localStorage.getItem('jwtToken');
+    if (!token) {
+      console.log('No JWT token found in localStorage');
+      return null;
     }
-    return userId;
+    try {
+      const decoded: any = jwtDecode(token);
+      return decoded.companyId;
+    } catch (error) {
+      console.error('Failed to decode JWT:', error);
+      return null;
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -60,21 +52,20 @@ const KnowledgeQuery: React.FC = () => {
     setResponse(null);
 
     try {
-      const userId = getUserId();
-      if (!userId) {
-        throw new Error('User ID not found');
+      const companyId = getCompanyIdFromToken();
+      if (!companyId) {
+        throw new Error('Company ID not found');
       }
 
-      const apiResponse = await apiClient.post<QueryResponse>('/analysis/ask', {
-        userId,
+      const response = await apiClient.post<QueryResponse>('/analysis/ask', {
+        companyId,
         query
       });
 
-      setResponse(apiResponse.data);
+      setResponse(response.data);
     } catch (error: any) {
       console.error('Error querying knowledge base:', error);
-      const errorMessage = error.response?.data?.error?.message || error.response?.data?.message || error.message || 'Failed to query knowledge base';
-      setError(errorMessage);
+      setError(error.response?.data?.message || error.message || 'Failed to query knowledge base');
     } finally {
       setIsLoading(false);
     }
@@ -126,39 +117,31 @@ const KnowledgeQuery: React.FC = () => {
 
       {error && (
         <div className="p-4 mb-6 bg-red-50 border border-red-200 rounded-lg">
-          <p className="text-red-800 font-medium">An error occurred</p>
-          <p className="text-red-700 mt-1">{error}</p>
+          <p className="text-red-800">{error}</p>
         </div>
       )}
 
-      {response && response.success && (
+      {response && (
         <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
           <div className="p-6">
             <h3 className="text-lg font-semibold mb-4">Answer</h3>
-            <div 
-              className="prose max-w-none text-gray-700"
-              dangerouslySetInnerHTML={{ __html: response.data?.answer || '' }}
-            />
+            <div className="prose max-w-none">
+              {response.data?.answer.split('\n').map((paragraph, index) => (
+                <p key={index} className="mb-4">
+                  {paragraph}
+                </p>
+              ))}
+            </div>
           </div>
           {response.data?.metadata && (
             <div className="border-t border-gray-200 bg-gray-50 p-4 rounded-b-lg">
-              <div className="text-sm text-gray-600 space-y-2">
-                <div className="flex items-center gap-4">
-                  <span className="font-semibold text-gray-700">Analyzed Resources:</span>
-                  <div className="flex items-center gap-4">
-                    <span className="flex items-center gap-1.5" title="Documents">
-                      <FileText size={14} />
-                      <span>{response.data.metadata.corpusStatus.documentCount}</span>
-                    </span>
-                    <span className="flex items-center gap-1.5" title="Call Recordings">
-                      <Phone size={14} />
-                      <span>{response.data.metadata.corpusStatus.callRecordingCount}</span>
-                    </span>
-                  </div>
-                </div>
-                <p><span className="font-semibold text-gray-700">Total:</span> {response.data.metadata.corpusStatus.totalCount} resources in knowledge base</p>
-                <p><span className="font-semibold text-gray-700">Model:</span> {response.data.metadata.model}</p>
-                <p><span className="font-semibold text-gray-700">Processed at:</span> {new Date(response.data.metadata.processedAt).toLocaleString()}</p>
+              <div className="text-sm text-gray-600">
+                <p>Processed at: {new Date(response.data.metadata.processedAt).toLocaleString()}</p>
+                <p>Model: {response.data.metadata.model}</p>
+                <p>
+                  Documents analyzed: {response.data.metadata.corpusStatus.documentCount}
+                  {response.data.metadata.corpusStatus.wasUpdated && ' (corpus updated)'}
+                </p>
               </div>
             </div>
           )}
