@@ -113,21 +113,16 @@ const KnowledgeBase: React.FC = () => {
     });
   };
 
-  // Function to get userId from JWT
+  // Function to get userId from localStorage
   const getUserIdFromToken = () => {
-    const token = localStorage.getItem('jwtToken');
-    if (!token) {
-      console.log('No JWT token found in localStorage');
+    // The host application syncs userId to localStorage
+    const userId = localStorage.getItem('userId');
+    if (!userId) {
+      console.log('No userId found in localStorage');
       return null;
     }
-    try {
-      const decoded: any = jwtDecode(token);
-      console.log('Decoded JWT:', decoded);
-      return decoded.userId;
-    } catch (error) {
-      console.error('Failed to decode JWT:', error);
-      return null;
-    }
+    console.log('User ID from localStorage:', userId);
+    return userId;
   };
 
   // Fetch documents from the backend
@@ -577,8 +572,8 @@ const KnowledgeBase: React.FC = () => {
         <div className="flex border-b border-gray-100">
           <button
             className={`px-6 py-3 text-sm font-medium ${activeTab === 'documents'
-                ? 'text-blue-600 border-b-2 border-blue-600'
-                : 'text-gray-500 hover:text-gray-700'
+              ? 'text-blue-600 border-b-2 border-blue-600'
+              : 'text-gray-500 hover:text-gray-700'
               }`}
             onClick={() => setActiveTab('documents')}
           >
@@ -587,8 +582,8 @@ const KnowledgeBase: React.FC = () => {
           </button>
           <button
             className={`px-6 py-3 text-sm font-medium ${activeTab === 'calls'
-                ? 'text-blue-600 border-b-2 border-blue-600'
-                : 'text-gray-500 hover:text-gray-700'
+              ? 'text-blue-600 border-b-2 border-blue-600'
+              : 'text-gray-500 hover:text-gray-700'
               }`}
             onClick={() => setActiveTab('calls')}
           >
@@ -674,9 +669,9 @@ const KnowledgeBase: React.FC = () => {
 
                     <div className="flex items-center justify-between">
                       <span className={`px-2 py-1 text-xs rounded-full whitespace-nowrap ${item.type === 'document' ? 'bg-blue-100 text-blue-800' :
-                          item.type === 'video' ? 'bg-red-100 text-red-800' :
-                            item.type === 'audio' ? 'bg-purple-100 text-purple-800' :
-                              'bg-green-100 text-green-800'
+                        item.type === 'video' ? 'bg-red-100 text-red-800' :
+                          item.type === 'audio' ? 'bg-purple-100 text-purple-800' :
+                            'bg-green-100 text-green-800'
                         }`}>
                         {item.type.charAt(0).toUpperCase() + item.type.slice(1)}
                       </span>
@@ -744,8 +739,8 @@ const KnowledgeBase: React.FC = () => {
                       <div className="flex items-center space-x-2 flex-shrink-0">
                         {call.processingOptions?.sentiment && call.sentiment && (
                           <span className={`px-2 py-1 text-xs rounded-full whitespace-nowrap ${call.sentiment === 'positive' ? 'bg-green-100 text-green-800' :
-                              call.sentiment === 'negative' ? 'bg-red-100 text-red-800' :
-                                'bg-gray-100 text-gray-800'
+                            call.sentiment === 'negative' ? 'bg-red-100 text-red-800' :
+                              'bg-gray-100 text-gray-800'
                             }`}>
                             {call.sentiment.charAt(0).toUpperCase() + call.sentiment.slice(1)} Sentiment
                           </span>
@@ -928,8 +923,8 @@ const KnowledgeBase: React.FC = () => {
                           <button
                             type="button"
                             className={`p-4 rounded-lg border ${uploadType === 'document'
-                                ? 'border-blue-500 bg-blue-50'
-                                : 'border-gray-200 hover:bg-gray-50'
+                              ? 'border-blue-500 bg-blue-50'
+                              : 'border-gray-200 hover:bg-gray-50'
                               } flex flex-col items-center justify-center`}
                             onClick={() => setUploadType('document')}
                           >
@@ -940,8 +935,8 @@ const KnowledgeBase: React.FC = () => {
                           <button
                             type="button"
                             className={`p-4 rounded-lg border ${uploadType === 'video'
-                                ? 'border-blue-500 bg-blue-50'
-                                : 'border-gray-200 hover:bg-gray-50'
+                              ? 'border-blue-500 bg-blue-50'
+                              : 'border-gray-200 hover:bg-gray-50'
                               } flex flex-col items-center justify-center`}
                             onClick={() => setUploadType('video')}
                           >
@@ -952,8 +947,8 @@ const KnowledgeBase: React.FC = () => {
                           <button
                             type="button"
                             className={`p-4 rounded-lg border ${uploadType === 'link'
-                                ? 'border-blue-500 bg-blue-50'
-                                : 'border-gray-200 hover:bg-gray-50'
+                              ? 'border-blue-500 bg-blue-50'
+                              : 'border-gray-200 hover:bg-gray-50'
                               } flex flex-col items-center justify-center`}
                             onClick={() => setUploadType('link')}
                           >
@@ -964,8 +959,8 @@ const KnowledgeBase: React.FC = () => {
                           <button
                             type="button"
                             className={`p-4 rounded-lg border ${uploadType === 'audio'
-                                ? 'border-blue-500 bg-blue-50'
-                                : 'border-gray-200 hover:bg-gray-50'
+                              ? 'border-blue-500 bg-blue-50'
+                              : 'border-gray-200 hover:bg-gray-50'
                               } flex flex-col items-center justify-center`}
                             onClick={() => setUploadType('audio')}
                           >
@@ -1416,8 +1411,8 @@ const KnowledgeBase: React.FC = () => {
                         <label className="text-sm font-medium text-gray-500">Sentiment</label>
                         <div className="mt-1">
                           <span className={`px-3 py-1.5 inline-flex text-sm rounded-full ${selectedItem.sentiment === 'positive' ? 'bg-green-100 text-green-800' :
-                              selectedItem.sentiment === 'negative' ? 'bg-red-100 text-red-800' :
-                                'bg-gray-100 text-gray-800'
+                            selectedItem.sentiment === 'negative' ? 'bg-red-100 text-red-800' :
+                              'bg-gray-100 text-gray-800'
                             }`}>
                             {selectedItem.sentiment.charAt(0).toUpperCase() + selectedItem.sentiment.slice(1)} Sentiment
                           </span>
