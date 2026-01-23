@@ -14,6 +14,7 @@ import AugmentedLearning from './components/AugmentedLearning';
 import CompanyManagement from './components/CompanyManagement';
 import UserManagement from './components/UserManagement';
 import PermissionsManagement from './components/PermissionsManagement';
+import ScriptGenerator from './components/ScriptGenerator';
 
 function App() {
   return (
@@ -37,6 +38,7 @@ function App() {
               <Route path="/companies" element={<CompanyManagement />} />
               <Route path="/users" element={<UserManagement />} />
               <Route path="/permissions" element={<PermissionsManagement />} />
+              <Route path="/script-generator" element={<ScriptGenerator />} />
               <Route path="/tags" element={<div className="p-6"><h1 className="text-2xl font-bold">Tags Management</h1><p className="mt-4">This feature is coming soon.</p></div>} />
               <Route path="/analytics" element={<div className="p-6"><h1 className="text-2xl font-bold">Analytics</h1><p className="mt-4">This feature is coming soon.</p></div>} />
               <Route path="/settings" element={<div className="p-6"><h1 className="text-2xl font-bold">Settings</h1><p className="mt-4">This feature is coming soon.</p></div>} />

@@ -9,7 +9,7 @@ const currentUser = mockUsers[0]; // Alex Morgan, admin at Acme Corporation
 const Sidebar: React.FC = () => {
   const location = useLocation();
   const [adminMenuOpen, setAdminMenuOpen] = useState(false);
-  
+
   // Define navigation items based on user role
   const navItems = [
     { path: '/', icon: <Home size={20} />, label: 'Dashboard', roles: ['admin', 'manager', 'rep'] },
@@ -18,13 +18,14 @@ const Sidebar: React.FC = () => {
     { path: '/knowledge', icon: <FileText size={20} />, label: 'Knowledge Base', roles: ['admin', 'manager', 'rep'] },
     { path: '/knowledge-insights', icon: <Brain size={20} />, label: 'KB Insights', roles: ['admin', 'manager'] },
     { path: '/knowledge-query', icon: <MessageSquare size={20} />, label: 'Ask KB', roles: ['admin', 'manager', 'rep'] },
+    { path: '/script-generator', icon: <FileText size={20} />, label: 'Script Generator', roles: ['admin', 'manager'] },
     { path: '/assistant', icon: <MessageSquare size={20} />, label: 'AI Assistant', roles: ['admin', 'manager', 'rep'] },
     { path: '/insights', icon: <Brain size={20} />, label: 'Contact Insights', roles: ['admin', 'manager', 'rep'] },
     { path: '/augmented-learning', icon: <Zap size={20} />, label: 'AI Learning', roles: ['admin'] },
     { path: '/tags', icon: <Tag size={20} />, label: 'Tags', roles: ['admin', 'manager'] },
     { path: '/analytics', icon: <BarChart2 size={20} />, label: 'Analytics', roles: ['admin', 'manager'] },
   ];
-  
+
   // Admin-only items
   const adminItems = [
     { path: '/companies', icon: <Building size={20} />, label: 'Companies', roles: ['admin'] },
@@ -32,7 +33,7 @@ const Sidebar: React.FC = () => {
     { path: '/permissions', icon: <Shield size={20} />, label: 'Permissions', roles: ['admin'] },
     { path: '/settings', icon: <Settings size={20} />, label: 'Settings', roles: ['admin', 'manager'] },
   ];
-  
+
   // Filter items based on user role
   const filteredNavItems = navItems.filter(item => item.roles.includes(currentUser.role));
   const filteredAdminItems = adminItems.filter(item => item.roles.includes(currentUser.role));
@@ -43,15 +44,15 @@ const Sidebar: React.FC = () => {
         <Brain size={24} className="text-blue-400" />
         <h1 className="text-xl font-bold">AI Knowledge Hub</h1>
       </div>
-      
+
       <div className="px-4 py-2">
         <div className="bg-gray-700 rounded-lg p-3">
           <div className="flex items-center">
             <div className="bg-blue-500 p-2 rounded-full">
               {currentUser.avatar ? (
-                <img 
-                  src={currentUser.avatar} 
-                  alt={currentUser.name} 
+                <img
+                  src={currentUser.avatar}
+                  alt={currentUser.name}
                   className="h-6 w-6 rounded-full"
                 />
               ) : (
@@ -65,16 +66,15 @@ const Sidebar: React.FC = () => {
           </div>
         </div>
       </div>
-      
+
       <nav className="mt-6">
         <ul>
           {filteredNavItems.map((item) => (
             <li key={item.path}>
               <Link
                 to={item.path}
-                className={`flex items-center space-x-3 px-4 py-3 hover:bg-gray-700 transition-colors ${
-                  location.pathname === item.path ? 'bg-gray-700 border-l-4 border-blue-400' : ''
-                }`}
+                className={`flex items-center space-x-3 px-4 py-3 hover:bg-gray-700 transition-colors ${location.pathname === item.path ? 'bg-gray-700 border-l-4 border-blue-400' : ''
+                  }`}
               >
                 <span className="text-gray-400">{item.icon}</span>
                 <span>{item.label}</span>
@@ -82,26 +82,25 @@ const Sidebar: React.FC = () => {
             </li>
           ))}
         </ul>
-        
+
         {filteredAdminItems.length > 0 && (
           <>
-            <div 
+            <div
               className="flex items-center justify-between px-4 py-3 text-gray-400 cursor-pointer hover:bg-gray-700"
               onClick={() => setAdminMenuOpen(!adminMenuOpen)}
             >
               <span className="font-medium">Administration</span>
               {adminMenuOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
             </div>
-            
+
             {adminMenuOpen && (
               <ul>
                 {filteredAdminItems.map((item) => (
                   <li key={item.path}>
                     <Link
                       to={item.path}
-                      className={`flex items-center space-x-3 px-6 py-2 hover:bg-gray-700 transition-colors ${
-                        location.pathname === item.path ? 'bg-gray-700 border-l-4 border-blue-400' : ''
-                      }`}
+                      className={`flex items-center space-x-3 px-6 py-2 hover:bg-gray-700 transition-colors ${location.pathname === item.path ? 'bg-gray-700 border-l-4 border-blue-400' : ''
+                        }`}
                     >
                       <span className="text-gray-400">{item.icon}</span>
                       <span className="text-sm">{item.label}</span>
@@ -113,7 +112,7 @@ const Sidebar: React.FC = () => {
           </>
         )}
       </nav>
-      
+
       <div className="p-4 mt-8">
         <div className="bg-gray-700 p-3 rounded-lg">
           <p className="text-sm text-gray-300">AI Assistant</p>
