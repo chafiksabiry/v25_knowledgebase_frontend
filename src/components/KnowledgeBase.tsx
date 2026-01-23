@@ -149,6 +149,26 @@ const KnowledgeBase: React.FC = () => {
           isPublic: true
         }));
         setKnowledgeItems(documents);
+
+        // Auto-complete onboarding step 7 (Knowledge Base) if documents exist
+        if (documents.length > 0) {
+          try {
+            const companyId = localStorage.getItem('companyId');
+            if (companyId) {
+              console.log('🎯 Existing documents found, ensuring onboarding step 7 is completed...');
+              await fetch(
+                `${import.meta.env.VITE_API_URL_ONBOARDING}/onboarding/companies/${companyId}/onboarding/phases/2/steps/7`,
+                {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ status: 'completed' })
+                }
+              );
+            }
+          } catch (err) {
+            console.error('Error auto-completing step 7 on mount:', err);
+          }
+        }
       } catch (error) {
         console.error('Error fetching documents:', error);
       }
@@ -245,6 +265,43 @@ const KnowledgeBase: React.FC = () => {
       };
 
       setKnowledgeItems(prevItems => [...prevItems, newItem]);
+
+      // Auto-complete onboarding step 7 (Knowledge Base) after first document upload
+      try {
+        const companyId = localStorage.getItem('companyId');
+        if (companyId) {
+          console.log('🎯 Auto-completing onboarding step 7 after document upload...');
+
+          const stepResponse = await fetch(
+            `${import.meta.env.VITE_API_URL_ONBOARDING}/onboarding/companies/${companyId}/onboarding/phases/2/steps/7`,
+            {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ status: 'completed' })
+            }
+          );
+
+          if (stepResponse.ok) {
+            console.log('✅ Onboarding step 7 marked as completed');
+
+            // Notify parent component via custom event
+            window.dispatchEvent(new CustomEvent('stepCompleted', {
+              detail: {
+                stepId: 7,
+                phaseId: 2,
+                status: 'completed'
+              }
+            }));
+          } else {
+            console.warn('⚠️ Failed to mark step 7 as completed:', await stepResponse.text());
+          }
+        }
+      } catch (onboardingError) {
+        console.error('❌ Error updating onboarding progress:', onboardingError);
+        // Don't fail the upload if onboarding update fails
+      }
 
       // Reset form and close modal
       setUploadName('');
