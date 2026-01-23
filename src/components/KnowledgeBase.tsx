@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Upload, File, FileText, Video, Link as LinkIcon, Plus, Search, Trash2, Filter, Download, Mic, Play, Clock, Pause, ChevronDown, ChevronUp, X, ExternalLink, Eye } from 'lucide-react';
 import { format } from 'date-fns';
 import { KnowledgeItem, CallRecord } from '../types';
-import { jwtDecode } from 'jwt-decode';
 import apiClient from '../api/client';
 
 const KnowledgeBase: React.FC = () => {
@@ -37,7 +36,7 @@ const KnowledgeBase: React.FC = () => {
   });
   const [selectedItem, setSelectedItem] = useState<any | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  
+
   // Load items from localStorage on mount
   useEffect(() => {
     const savedItems = localStorage.getItem('knowledgeItems');
@@ -50,19 +49,19 @@ const KnowledgeBase: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('knowledgeItems', JSON.stringify(knowledgeItems));
   }, [knowledgeItems]);
-  
+
   // Filter knowledge base items based on search and type
   const filteredItems = knowledgeItems.filter(item => {
-    const matchesSearch = 
+    const matchesSearch =
       item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
-    
+
     const matchesType = typeFilter === 'all' || item.type === typeFilter;
-    
+
     return matchesSearch && matchesType;
   });
-  
+
   // Get icon based on item type
   const getItemIcon = (type: string) => {
     switch (type) {
@@ -78,7 +77,7 @@ const KnowledgeBase: React.FC = () => {
         return <File size={20} className="text-gray-500" />;
     }
   };
-  
+
   // Get audio duration from file
   const getAudioDuration = (file: File): Promise<number> => {
     return new Promise((resolve) => {
@@ -112,35 +111,29 @@ const KnowledgeBase: React.FC = () => {
       reader.readAsDataURL(file);
     });
   };
-  
-  // Function to get companyId from JWT
-  const getCompanyIdFromToken = () => {
-    const token = localStorage.getItem('jwtToken');
-    if (!token) {
-      console.log('No JWT token found in localStorage');
+
+  // Function to get userId from localStorage
+  const getUserId = () => {
+    const userId = localStorage.getItem('userId');
+    if (!userId) {
+      console.log('No userId found in localStorage');
       return null;
     }
-    try {
-      const decoded: any = jwtDecode(token);
-      console.log('Decoded JWT:', decoded);
-      return decoded.companyId;
-    } catch (error) {
-      console.error('Failed to decode JWT:', error);
-      return null;
-    }
+    console.log('User ID:', userId);
+    return userId;
   };
 
   // Fetch documents from the backend
   useEffect(() => {
     const fetchDocuments = async () => {
       try {
-        const companyId = getCompanyIdFromToken();
-        if (!companyId) {
-          throw new Error('Company ID not found');
+        const userId = getUserId();
+        if (!userId) {
+          throw new Error('User ID not found');
         }
 
         const response = await apiClient.get('/documents', {
-          params: { companyId }
+          params: { userId }
         });
         console.log('Response fetching documents:', response);
         const documents = response.data.documents.map((doc: any) => ({
@@ -168,13 +161,13 @@ const KnowledgeBase: React.FC = () => {
   useEffect(() => {
     const fetchCallRecords = async () => {
       try {
-        const companyId = getCompanyIdFromToken();
-        if (!companyId) {
-          throw new Error('Company ID not found');
+        const userId = getUserId();
+        if (!userId) {
+          throw new Error('User ID not found');
         }
 
         const response = await apiClient.get('/call-recordings', {
-          params: { companyId }
+          params: { userId }
         });
         console.log('Response fetching call records:', response);
         const calls = response.data.callRecordings.map((call: any) => ({
@@ -213,18 +206,18 @@ const KnowledgeBase: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsUploading(true);
-    
+
     try {
       if (!uploadFile) {
         throw new Error('No file selected');
       }
 
-      const companyId = getCompanyIdFromToken();
-      if (!companyId) {
-        throw new Error('Company ID not found');
+      const userId = getUserId();
+      if (!userId) {
+        throw new Error('User ID not found');
       }
 
-      console.log('Company ID:', companyId);
+      console.log('User ID:', userId);
 
       const formData = new FormData();
       formData.append('file', uploadFile);
@@ -232,7 +225,7 @@ const KnowledgeBase: React.FC = () => {
       formData.append('description', uploadDescription);
       formData.append('tags', uploadTags);
       formData.append('uploadedBy', 'Current User');
-      formData.append('companyId', companyId);
+      formData.append('userId', userId);
 
       const response = await apiClient.post('/documents/upload', formData);
 
@@ -267,28 +260,28 @@ const KnowledgeBase: React.FC = () => {
       setIsUploading(false);
     }
   };
-  
+
   // Handle item deletion with improved cleanup
   const handleDelete = async (id: string) => {
     console.log('Attempting to delete item with ID:', id);
     console.log('Active tab:', activeTab);
-    
+
     try {
       if (activeTab === 'documents') {
         // Log the item being deleted
         const itemToDelete = knowledgeItems.find(item => item.id === id);
         console.log('Document being deleted:', itemToDelete);
-        
+
         await apiClient.delete(`/documents/${id}`);
         setKnowledgeItems(prevItems => prevItems.filter(item => item.id !== id));
       } else {
         // Log the call being deleted
         const callToDelete = callRecords.find(call => call.id === id);
         console.log('Call recording being deleted:', callToDelete);
-        
+
         // Delete call recording from the backend
         await apiClient.delete(`/call-recordings/${id}`);
-        
+
         // Clean up audio resources and update state
         setCallRecords(prevCalls => {
           const call = prevCalls.find(call => call.id === id);
@@ -297,7 +290,7 @@ const KnowledgeBase: React.FC = () => {
           }
           return prevCalls.filter(call => call.id !== id);
         });
-        
+
         // If this call was playing, stop it and reset audio state
         if (playingCallId === id) {
           if (currentAudio) {
@@ -322,13 +315,13 @@ const KnowledgeBase: React.FC = () => {
       try {
         // Stop playback
         call.audioState.audioInstance.pause();
-        
+
         // Remove event listeners
         call.audioState.audioInstance.onloadedmetadata = null;
         call.audioState.audioInstance.ontimeupdate = null;
         call.audioState.audioInstance.onended = null;
         call.audioState.audioInstance.onerror = null;
-        
+
         // Release object URL
         if (call.audioState.audioInstance.src) {
           URL.revokeObjectURL(call.audioState.audioInstance.src);
@@ -337,7 +330,7 @@ const KnowledgeBase: React.FC = () => {
         console.error('Error cleaning up audio instance:', error);
       }
     }
-    
+
     // Release recording URL
     if (call.recordingUrl) {
       try {
@@ -388,20 +381,20 @@ const KnowledgeBase: React.FC = () => {
   const handleCallSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsUploading(true);
-    
+
     try {
       if (!uploadFile) {
         throw new Error('No file selected');
       }
 
-      const companyId = getCompanyIdFromToken();
-      if (!companyId) {
-        throw new Error('Company ID not found');
+      const userId = getUserId();
+      if (!userId) {
+        throw new Error('User ID not found');
       }
 
       const audioUrl = await createFileUrl(uploadFile);
       const duration = await getAudioDuration(uploadFile);
-      
+
       const formData = new FormData();
       formData.append('file', uploadFile);
       formData.append('contactId', uploadName);
@@ -412,7 +405,7 @@ const KnowledgeBase: React.FC = () => {
       formData.append('tags', uploadTags);
       formData.append('aiInsights', '');
       formData.append('repId', 'current-user');
-      formData.append('companyId', companyId);
+      formData.append('userId', userId);
 
       const response = await apiClient.post('/call-recordings/upload', formData);
 
@@ -441,9 +434,9 @@ const KnowledgeBase: React.FC = () => {
           showTranscript: false
         }
       };
-      
+
       setCallRecords(prevCalls => [...prevCalls, newCall]);
-      
+
       // Reset form
       setUploadName('');
       setUploadDescription('');
@@ -481,21 +474,21 @@ const KnowledgeBase: React.FC = () => {
 
     // Create new audio instance
     const audio = new Audio(recordingUrl);
-    
+
     // Set up event listeners
     audio.addEventListener('loadedmetadata', () => {
       setDuration(audio.duration);
     });
-    
+
     audio.addEventListener('timeupdate', () => {
       setCurrentTime(audio.currentTime);
     });
-    
+
     audio.addEventListener('ended', () => {
       setIsPlaying(false);
       setCurrentTime(0);
     });
-    
+
     // Try to play the audio
     audio.play().then(() => {
       setIsPlaying(true);
@@ -536,7 +529,7 @@ const KnowledgeBase: React.FC = () => {
     if (isNaN(time) || time < 0) {
       return '0:00';
     }
-    
+
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
@@ -571,27 +564,25 @@ const KnowledgeBase: React.FC = () => {
           The AI will use this information to provide better insights and assistance when handling contacts.
         </p>
       </div>
-      
+
       {/* Tabs */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-100 mb-6">
         <div className="flex border-b border-gray-100">
           <button
-            className={`px-6 py-3 text-sm font-medium ${
-              activeTab === 'documents' 
-                ? 'text-blue-600 border-b-2 border-blue-600' 
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
+            className={`px-6 py-3 text-sm font-medium ${activeTab === 'documents'
+              ? 'text-blue-600 border-b-2 border-blue-600'
+              : 'text-gray-500 hover:text-gray-700'
+              }`}
             onClick={() => setActiveTab('documents')}
           >
             <FileText size={16} className="inline mr-2" />
             Documents & Media
           </button>
           <button
-            className={`px-6 py-3 text-sm font-medium ${
-              activeTab === 'calls' 
-                ? 'text-blue-600 border-b-2 border-blue-600' 
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
+            className={`px-6 py-3 text-sm font-medium ${activeTab === 'calls'
+              ? 'text-blue-600 border-b-2 border-blue-600'
+              : 'text-gray-500 hover:text-gray-700'
+              }`}
             onClick={() => setActiveTab('calls')}
           >
             <Mic size={16} className="inline mr-2" />
@@ -599,7 +590,7 @@ const KnowledgeBase: React.FC = () => {
           </button>
         </div>
       </div>
-      
+
       {/* Filters and Search */}
       <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 mb-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
@@ -615,7 +606,7 @@ const KnowledgeBase: React.FC = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          
+
           <div className="flex items-center space-x-4">
             {activeTab === 'documents' && (
               <div className="flex items-center space-x-2">
@@ -633,8 +624,8 @@ const KnowledgeBase: React.FC = () => {
                 </select>
               </div>
             )}
-            
-            <button 
+
+            <button
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center"
               onClick={() => setShowUploadModal(true)}
             >
@@ -650,22 +641,22 @@ const KnowledgeBase: React.FC = () => {
         filteredItems.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredItems.map((item) => (
-              <div 
-                key={item.id} 
+              <div
+                key={item.id}
                 className="bg-white p-5 rounded-lg shadow-sm border border-gray-100 hover:shadow-md transition-shadow overflow-hidden"
               >
                 <div className="flex items-start">
                   <div className="p-3 rounded-lg bg-gray-100 mr-4 flex-shrink-0">
                     {getItemIcon(item.type)}
                   </div>
-                  
+
                   <div className="flex-grow min-w-0">
                     <h3 className="text-lg font-medium text-gray-900 mb-1 truncate">{item.name}</h3>
                     <p className="text-sm text-gray-500 mb-3 break-words line-clamp-2">{item.description}</p>
-                    
+
                     <div className="flex flex-wrap gap-1 mb-3">
                       {item.tags.map((tag: string, index: number) => (
-                        <span 
+                        <span
                           key={`${item.id}-${tag}`}
                           className="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-700 whitespace-nowrap"
                         >
@@ -673,26 +664,25 @@ const KnowledgeBase: React.FC = () => {
                         </span>
                       ))}
                     </div>
-                    
+
                     <div className="flex items-center justify-between">
-                      <span className={`px-2 py-1 text-xs rounded-full whitespace-nowrap ${
-                        item.type === 'document' ? 'bg-blue-100 text-blue-800' : 
-                        item.type === 'video' ? 'bg-red-100 text-red-800' : 
-                        item.type === 'audio' ? 'bg-purple-100 text-purple-800' :
-                        'bg-green-100 text-green-800'
-                      }`}>
+                      <span className={`px-2 py-1 text-xs rounded-full whitespace-nowrap ${item.type === 'document' ? 'bg-blue-100 text-blue-800' :
+                        item.type === 'video' ? 'bg-red-100 text-red-800' :
+                          item.type === 'audio' ? 'bg-purple-100 text-purple-800' :
+                            'bg-green-100 text-green-800'
+                        }`}>
                         {item.type.charAt(0).toUpperCase() + item.type.slice(1)}
                       </span>
-                      
+
                       <div className="flex space-x-2 flex-shrink-0">
-                        <button 
+                        <button
                           onClick={() => handleView(item)}
                           className="text-blue-600 hover:text-blue-800 p-1"
                           title="View details"
                         >
                           <Eye size={16} />
                         </button>
-                        <button 
+                        <button
                           className="text-red-600 hover:text-red-800 p-1"
                           onClick={() => handleDelete(item.id)}
                           title="Delete"
@@ -718,7 +708,7 @@ const KnowledgeBase: React.FC = () => {
                 : "Your knowledge base is empty. Add documents, videos, or links to get started."}
             </p>
             {!searchTerm && typeFilter === 'all' && (
-              <button 
+              <button
                 className="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center mx-auto"
                 onClick={() => setShowUploadModal(true)}
               >
@@ -732,36 +722,35 @@ const KnowledgeBase: React.FC = () => {
         <div className="space-y-4">
           {callRecords.length > 0 ? (
             callRecords.map((call) => (
-              <div 
-                key={call.id} 
+              <div
+                key={call.id}
                 className="bg-white p-5 rounded-lg shadow-sm border border-gray-100 hover:shadow-md transition-shadow overflow-hidden"
               >
                 <div className="flex items-start">
                   <div className="p-3 rounded-lg bg-purple-100 mr-4 flex-shrink-0">
                     <Mic size={20} className="text-purple-500" />
                   </div>
-                  
+
                   <div className="flex-grow min-w-0">
                     <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
                       <h3 className="text-lg font-medium text-gray-900 truncate">{call.contactId}</h3>
                       <div className="flex items-center space-x-2 flex-shrink-0">
                         {call.processingOptions?.sentiment && call.sentiment && (
-                          <span className={`px-2 py-1 text-xs rounded-full whitespace-nowrap ${
-                            call.sentiment === 'positive' ? 'bg-green-100 text-green-800' : 
-                            call.sentiment === 'negative' ? 'bg-red-100 text-red-800' : 
-                            'bg-gray-100 text-gray-800'
-                          }`}>
+                          <span className={`px-2 py-1 text-xs rounded-full whitespace-nowrap ${call.sentiment === 'positive' ? 'bg-green-100 text-green-800' :
+                            call.sentiment === 'negative' ? 'bg-red-100 text-red-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
                             {call.sentiment.charAt(0).toUpperCase() + call.sentiment.slice(1)} Sentiment
                           </span>
                         )}
-                        <button 
+                        <button
                           onClick={() => handleView(call)}
                           className="text-blue-600 hover:text-blue-800 p-1"
                           title="View details"
                         >
                           <Eye size={16} />
                         </button>
-                        <button 
+                        <button
                           className="text-red-600 hover:text-red-800 p-1"
                           onClick={() => handleDelete(call.id)}
                           title="Delete call recording"
@@ -770,17 +759,17 @@ const KnowledgeBase: React.FC = () => {
                         </button>
                       </div>
                     </div>
-                    
+
                     <div className="flex items-center text-sm text-gray-500 mb-3 whitespace-nowrap">
                       <Clock size={14} className="mr-1 flex-shrink-0" />
                       {call.date} • {call.duration} minutes
                     </div>
-                    
+
                     <p className="text-sm text-gray-700 mb-3 break-words overflow-hidden">{call.summary}</p>
-                    
+
                     <div className="flex flex-wrap gap-1 mb-3">
                       {call.tags.map((tag: string, index: number) => (
-                        <span 
+                        <span
                           key={`${call.id}-${tag}`}
                           className="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-700 whitespace-nowrap"
                         >
@@ -788,7 +777,7 @@ const KnowledgeBase: React.FC = () => {
                         </span>
                       ))}
                     </div>
-                    
+
                     {call.processingOptions?.insights && call.aiInsights.length > 0 && (
                       <div className="bg-gray-50 p-3 rounded-lg mb-3 overflow-hidden">
                         <h4 className="text-sm font-medium text-gray-700 mb-2">AI Insights</h4>
@@ -799,20 +788,20 @@ const KnowledgeBase: React.FC = () => {
                         </ul>
                       </div>
                     )}
-                    
+
                     <div className="flex items-center justify-between">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center space-x-2 flex-wrap gap-2">
-                          <button 
+                          <button
                             className="flex items-center text-sm text-blue-600 hover:text-blue-800 whitespace-nowrap"
                             onClick={() => togglePlayer(call.id)}
                           >
                             {showPlayer[call.id] ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                             <span className="ml-1">Play Recording</span>
                           </button>
-                          
+
                           {call.processingOptions?.transcription && (
-                            <button 
+                            <button
                               className="flex items-center text-sm text-purple-600 hover:text-purple-800 whitespace-nowrap"
                               onClick={() => toggleTranscript(call.id)}
                             >
@@ -833,7 +822,7 @@ const KnowledgeBase: React.FC = () => {
                         {showPlayer[call.id] && (
                           <div className="mt-2 p-3 bg-gray-50 rounded-lg">
                             <div className="flex items-center space-x-3">
-                              <button 
+                              <button
                                 className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors flex-shrink-0"
                                 onClick={() => handlePlayRecording(call.recordingUrl, call.id)}
                                 title={playingCallId === call.id && isPlaying ? "Pause" : "Play"}
@@ -857,11 +846,11 @@ const KnowledgeBase: React.FC = () => {
                                     disabled={!duration}
                                     title="Seek"
                                   />
-                                  <div 
+                                  <div
                                     className="absolute h-full bg-blue-600 rounded-full"
-                                    style={{ 
-                                      width: `${duration ? 
-                                        (playingCallId === call.id ? (currentTime / duration) * 100 : 0) : 0}%` 
+                                    style={{
+                                      width: `${duration ?
+                                        (playingCallId === call.id ? (currentTime / duration) * 100 : 0) : 0}%`
                                     }}
                                   />
                                 </div>
@@ -890,7 +879,7 @@ const KnowledgeBase: React.FC = () => {
                   : "Your call recordings library is empty. Upload your first call recording to get started."}
               </p>
               {!searchTerm && (
-                <button 
+                <button
                   className="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center mx-auto"
                   onClick={() => setShowUploadModal(true)}
                 >
@@ -920,7 +909,7 @@ const KnowledgeBase: React.FC = () => {
                 ×
               </button>
             </div>
-            
+
             <div className="overflow-y-auto flex-grow">
               <form onSubmit={activeTab === 'documents' ? handleSubmit : handleCallSubmit}>
                 <div className="p-6">
@@ -931,50 +920,46 @@ const KnowledgeBase: React.FC = () => {
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                           <button
                             type="button"
-                            className={`p-4 rounded-lg border ${
-                              uploadType === 'document' 
-                                ? 'border-blue-500 bg-blue-50' 
-                                : 'border-gray-200 hover:bg-gray-50'
-                            } flex flex-col items-center justify-center`}
+                            className={`p-4 rounded-lg border ${uploadType === 'document'
+                              ? 'border-blue-500 bg-blue-50'
+                              : 'border-gray-200 hover:bg-gray-50'
+                              } flex flex-col items-center justify-center`}
                             onClick={() => setUploadType('document')}
                           >
                             <FileText size={24} className={uploadType === 'document' ? 'text-blue-500' : 'text-gray-500'} />
                             <span className="mt-2 text-sm">Document</span>
                           </button>
-                          
+
                           <button
                             type="button"
-                            className={`p-4 rounded-lg border ${
-                              uploadType === 'video' 
-                                ? 'border-blue-500 bg-blue-50' 
-                                : 'border-gray-200 hover:bg-gray-50'
-                            } flex flex-col items-center justify-center`}
+                            className={`p-4 rounded-lg border ${uploadType === 'video'
+                              ? 'border-blue-500 bg-blue-50'
+                              : 'border-gray-200 hover:bg-gray-50'
+                              } flex flex-col items-center justify-center`}
                             onClick={() => setUploadType('video')}
                           >
                             <Video size={24} className={uploadType === 'video' ? 'text-blue-500' : 'text-gray-500'} />
                             <span className="mt-2 text-sm">Video</span>
                           </button>
-                          
+
                           <button
                             type="button"
-                            className={`p-4 rounded-lg border ${
-                              uploadType === 'link' 
-                                ? 'border-blue-500 bg-blue-50' 
-                                : 'border-gray-200 hover:bg-gray-50'
-                            } flex flex-col items-center justify-center`}
+                            className={`p-4 rounded-lg border ${uploadType === 'link'
+                              ? 'border-blue-500 bg-blue-50'
+                              : 'border-gray-200 hover:bg-gray-50'
+                              } flex flex-col items-center justify-center`}
                             onClick={() => setUploadType('link')}
                           >
                             <LinkIcon size={24} className={uploadType === 'link' ? 'text-blue-500' : 'text-gray-500'} />
                             <span className="mt-2 text-sm">Link</span>
                           </button>
-                          
+
                           <button
                             type="button"
-                            className={`p-4 rounded-lg border ${
-                              uploadType === 'audio' 
-                                ? 'border-blue-500 bg-blue-50' 
-                                : 'border-gray-200 hover:bg-gray-50'
-                            } flex flex-col items-center justify-center`}
+                            className={`p-4 rounded-lg border ${uploadType === 'audio'
+                              ? 'border-blue-500 bg-blue-50'
+                              : 'border-gray-200 hover:bg-gray-50'
+                              } flex flex-col items-center justify-center`}
                             onClick={() => setUploadType('audio')}
                           >
                             <Mic size={24} className={uploadType === 'audio' ? 'text-blue-500' : 'text-gray-500'} />
@@ -982,7 +967,7 @@ const KnowledgeBase: React.FC = () => {
                           </button>
                         </div>
                       </div>
-                      
+
                       <div className="mb-4">
                         <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
                           Name
@@ -997,7 +982,7 @@ const KnowledgeBase: React.FC = () => {
                           required
                         />
                       </div>
-                      
+
                       <div className="mb-4">
                         <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
                           Description
@@ -1012,7 +997,7 @@ const KnowledgeBase: React.FC = () => {
                           required
                         />
                       </div>
-                      
+
                       {uploadType === 'link' ? (
                         <div className="mb-4">
                           <label htmlFor="url" className="block text-sm font-medium text-gray-700 mb-2">
@@ -1041,21 +1026,21 @@ const KnowledgeBase: React.FC = () => {
                                   <span className="font-semibold">Click to upload</span> or drag and drop
                                 </p>
                                 <p className="text-xs text-gray-500">
-                                  {uploadType === 'document' 
-                                    ? 'PDF, DOCX, TXT, or other document formats' 
+                                  {uploadType === 'document'
+                                    ? 'PDF, DOCX, TXT, or other document formats'
                                     : uploadType === 'video'
                                       ? 'MP4, MOV, or other video formats'
                                       : 'MP3, WAV, or other audio formats'
                                   }
                                 </p>
                               </div>
-                              <input 
-                                type="file" 
-                                className="hidden" 
+                              <input
+                                type="file"
+                                className="hidden"
                                 onChange={handleFileChange}
                                 accept={
-                                  uploadType === 'document' 
-                                    ? ".pdf,.docx,.txt,.md,.csv,.xlsx" 
+                                  uploadType === 'document'
+                                    ? ".pdf,.docx,.txt,.md,.csv,.xlsx"
                                     : uploadType === 'video'
                                       ? ".mp4,.mov,.avi,.webm"
                                       : ".mp3,.wav,.ogg,.m4a"
@@ -1070,7 +1055,7 @@ const KnowledgeBase: React.FC = () => {
                           )}
                         </div>
                       )}
-                      
+
                       <div className="mb-4">
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Tags
@@ -1132,9 +1117,9 @@ const KnowledgeBase: React.FC = () => {
                               </p>
                               <p className="text-xs text-gray-500">MP3, WAV, or other audio formats</p>
                             </div>
-                            <input 
-                              type="file" 
-                              className="hidden" 
+                            <input
+                              type="file"
+                              className="hidden"
                               onChange={handleFileChange}
                               accept=".mp3,.wav,.ogg,.m4a"
                               required
@@ -1219,7 +1204,7 @@ const KnowledgeBase: React.FC = () => {
                     </>
                   )}
                 </div>
-                
+
                 <div className="p-6 border-t border-gray-200 flex justify-end space-x-3 flex-shrink-0">
                   <button
                     type="button"
@@ -1303,7 +1288,7 @@ const KnowledgeBase: React.FC = () => {
                         <label className="text-sm font-medium text-gray-500">Tags</label>
                         <div className="flex flex-wrap gap-2 mt-1">
                           {selectedItem.tags.map((tag: string, index: number) => (
-                            <span 
+                            <span
                               key={index}
                               className="px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-sm"
                             >
@@ -1349,7 +1334,7 @@ const KnowledgeBase: React.FC = () => {
                         <label className="text-sm font-medium text-gray-500">Tags</label>
                         <div className="flex flex-wrap gap-2 mt-1">
                           {selectedItem.tags.map((tag: string, index: number) => (
-                            <span 
+                            <span
                               key={index}
                               className="px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-sm"
                             >
@@ -1379,7 +1364,7 @@ const KnowledgeBase: React.FC = () => {
                     {/* Audio Player */}
                     <div className="mt-4 p-3 bg-gray-50 rounded-lg">
                       <div className="flex items-center space-x-3">
-                        <button 
+                        <button
                           className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors flex-shrink-0"
                           onClick={() => handlePlayRecording(selectedItem.recordingUrl, selectedItem.id)}
                           title={playingCallId === selectedItem.id && isPlaying ? "Pause" : "Play"}
@@ -1403,11 +1388,11 @@ const KnowledgeBase: React.FC = () => {
                               disabled={!duration}
                               title="Seek"
                             />
-                            <div 
+                            <div
                               className="absolute h-full bg-blue-600 rounded-full"
-                              style={{ 
-                                width: `${duration ? 
-                                  (playingCallId === selectedItem.id ? (currentTime / duration) * 100 : 0) : 0}%` 
+                              style={{
+                                width: `${duration ?
+                                  (playingCallId === selectedItem.id ? (currentTime / duration) * 100 : 0) : 0}%`
                               }}
                             />
                           </div>
@@ -1423,11 +1408,10 @@ const KnowledgeBase: React.FC = () => {
                       <div className="mt-4">
                         <label className="text-sm font-medium text-gray-500">Sentiment</label>
                         <div className="mt-1">
-                          <span className={`px-3 py-1.5 inline-flex text-sm rounded-full ${
-                            selectedItem.sentiment === 'positive' ? 'bg-green-100 text-green-800' : 
-                            selectedItem.sentiment === 'negative' ? 'bg-red-100 text-red-800' : 
-                            'bg-gray-100 text-gray-800'
-                          }`}>
+                          <span className={`px-3 py-1.5 inline-flex text-sm rounded-full ${selectedItem.sentiment === 'positive' ? 'bg-green-100 text-green-800' :
+                            selectedItem.sentiment === 'negative' ? 'bg-red-100 text-red-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
                             {selectedItem.sentiment.charAt(0).toUpperCase() + selectedItem.sentiment.slice(1)} Sentiment
                           </span>
                         </div>
