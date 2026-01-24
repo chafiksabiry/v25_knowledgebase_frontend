@@ -2,7 +2,7 @@
 
 interface ImportMetaEnv {
     readonly VITE_API_URL_ONBOARDING: string;
-    readonly VITE_BACKEND_API: string;
+    readonly VITE_BACKEND_KNOWLEDGEBASE_API: string;
     // Add other variables as needed
 }
 

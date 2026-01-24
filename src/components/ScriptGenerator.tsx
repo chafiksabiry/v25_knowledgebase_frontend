@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import apiClient from '../api/client';
 import Cookies from 'js-cookie';
-import { 
+import {
   User, Headphones, Plus, ArrowLeft, Eye, Calendar, Target, Globe, Trash2, ToggleLeft, ToggleRight, Filter,
   FileText, HandHeart, Shield, Search, Star, FileCheck, AlertTriangle, CheckCircle, RefreshCw, Edit2, MessageSquare
 } from 'lucide-react';
@@ -234,18 +234,18 @@ const getPhaseConfig = (phaseName: string) => {
 // Helper function to group script steps by phase
 const groupScriptByPhase = (script: { phase: string; actor: string; replica: string }[]) => {
   const grouped: { [key: string]: { phase: string; actor: string; replica: string }[] } = {};
-  
+
   script.forEach(step => {
     if (!grouped[step.phase]) {
       grouped[step.phase] = [];
     }
     grouped[step.phase].push(step);
   });
-  
+
   // Sort phases according to REPS order
   const sortedPhases = REPS_PHASES.map(phase => phase.name).filter(phaseName => grouped[phaseName]);
   const otherPhases = Object.keys(grouped).filter(phaseName => !REPS_PHASES.some(phase => phase.name === phaseName));
-  
+
   return [...sortedPhases, ...otherPhases].map(phaseName => ({
     phaseName,
     steps: grouped[phaseName]
@@ -286,7 +286,11 @@ const ScriptGenerator: React.FC = () => {
       // Utilise la variable d'environnement en standalone
       return import.meta.env.VITE_STANDALONE_COMPANY_ID;
     } else {
-      // Utilise le cookie en in-app
+      // Check localStorage first (more reliable in our micro-frontend setup)
+      const localCompanyId = localStorage.getItem('companyId');
+      if (localCompanyId) return localCompanyId;
+
+      // Fallback to cookie
       return Cookies.get('companyId');
     }
   };
@@ -312,7 +316,7 @@ const ScriptGenerator: React.FC = () => {
 
     setIsLoadingGigs(true);
     setGigsError(null);
-    
+
     try {
       const gigsApiUrl = import.meta.env.VITE_GIGS_API_URL;
       if (!gigsApiUrl) {
@@ -341,15 +345,15 @@ const ScriptGenerator: React.FC = () => {
     try {
       const companyId = getCompanyId();
       if (!companyId) throw new Error('Company ID not found');
-      const backendUrl = import.meta.env.VITE_BACKEND_API;
+      const backendUrl = import.meta.env.VITE_BACKEND_KNOWLEDGEBASE_API;
       if (!backendUrl) throw new Error('Backend API URL not configured');
-      
+
       // Add status filter to URL if not 'all'
       let url = `${backendUrl}/api/scripts/company/${companyId}`;
       if (statusFilter !== 'all') {
         url += `?status=${statusFilter}`;
       }
-      
+
       console.log('[SCRIPTS] Fetching scripts for companyId:', companyId, 'with filter:', statusFilter, 'URL:', url);
       const response = await fetch(url);
       if (!response.ok) throw new Error(`Failed to fetch scripts: ${response.statusText}`);
@@ -368,7 +372,7 @@ const ScriptGenerator: React.FC = () => {
     setIsLoadingScripts(true);
     setScriptsError(null);
     try {
-      const backendUrl = import.meta.env.VITE_BACKEND_API;
+      const backendUrl = import.meta.env.VITE_BACKEND_KNOWLEDGEBASE_API;
       if (!backendUrl) throw new Error('Backend API URL not configured');
       const url = `${backendUrl}/scripts/gig/${gigId}`;
       console.log('[SCRIPTS] Fetching scripts for gigId:', gigId, 'URL:', url);
@@ -409,13 +413,13 @@ const ScriptGenerator: React.FC = () => {
       const endpoint = `${apiUrl}/onboarding/companies/${companyId}/onboarding/phases/2/steps/8`;
       const response = await apiClient.put(endpoint, { status: 'completed' });
       console.log('Onboarding progress (script) update response:', response.data);
-      
+
       // Update the companyOnboardingProgress cookie with the response data
       if (response.data) {
         Cookies.set('companyOnboardingProgress', JSON.stringify(response.data), { expires: 7 });
         console.log('Updated companyOnboardingProgress cookie with new data');
       }
-      
+
       return response.data;
     } catch (error) {
       console.error('Error updating onboarding progress (script):', error);
@@ -499,9 +503,9 @@ const ScriptGenerator: React.FC = () => {
   const handleUpdateScriptStatus = async (scriptId: string, isActive: boolean) => {
     setUpdatingScriptId(scriptId);
     try {
-      const backendUrl = import.meta.env.VITE_BACKEND_API;
+      const backendUrl = import.meta.env.VITE_BACKEND_KNOWLEDGEBASE_API;
       if (!backendUrl) throw new Error('Backend API URL not configured');
-      
+
       const response = await fetch(`${backendUrl}/api/scripts/${scriptId}/status`, {
         method: 'PUT',
         headers: {
@@ -518,10 +522,10 @@ const ScriptGenerator: React.FC = () => {
       console.log('[SCRIPTS] Script status updated successfully:', data);
 
       // Update the script in the local state
-      setScripts(prevScripts => 
-        prevScripts.map(script => 
-          script._id === scriptId 
-            ? { ...script, isActive } 
+      setScripts(prevScripts =>
+        prevScripts.map(script =>
+          script._id === scriptId
+            ? { ...script, isActive }
             : script
         )
       );
@@ -546,9 +550,9 @@ const ScriptGenerator: React.FC = () => {
 
     setDeletingScriptId(scriptId);
     try {
-      const backendUrl = import.meta.env.VITE_BACKEND_API;
+      const backendUrl = import.meta.env.VITE_BACKEND_KNOWLEDGEBASE_API;
       if (!backendUrl) throw new Error('Backend API URL not configured');
-      
+
       const response = await fetch(`${backendUrl}/api/scripts/${scriptId}`, {
         method: 'DELETE',
       });
@@ -562,7 +566,7 @@ const ScriptGenerator: React.FC = () => {
 
       // Remove the script from the local state
       setScripts(prevScripts => prevScripts.filter(script => script._id !== scriptId));
-      
+
       // If the deleted script was selected, clear the selection and go back to table
       if (selectedScript?._id === scriptId) {
         setSelectedScript(null);
@@ -585,11 +589,11 @@ const ScriptGenerator: React.FC = () => {
 
     setRegeneratingScriptId(scriptId);
     try {
-      const backendUrl = import.meta.env.VITE_BACKEND_API;
+      const backendUrl = import.meta.env.VITE_BACKEND_KNOWLEDGEBASE_API;
       const companyId = getCompanyId();
       if (!backendUrl) throw new Error('Backend API URL not configured');
       if (!companyId) throw new Error('Company ID not found');
-      
+
       const response = await fetch(`${backendUrl}/api/scripts/${scriptId}/regenerate`, {
         method: 'POST',
         headers: {
@@ -605,9 +609,9 @@ const ScriptGenerator: React.FC = () => {
       console.log('[SCRIPTS] Script regenerated successfully:', data);
 
       // Update the script in the local state
-      setScripts(prevScripts => 
-        prevScripts.map(script => 
-          script._id === scriptId 
+      setScripts(prevScripts =>
+        prevScripts.map(script =>
+          script._id === scriptId
             ? data.data
             : script
         )
@@ -629,11 +633,11 @@ const ScriptGenerator: React.FC = () => {
   const handleRefineScriptPart = async (scriptId: string, stepIndex: number, refinementPrompt: string) => {
     try {
       setProcessingSteps(prev => [...prev, stepIndex]);
-      const backendUrl = import.meta.env.VITE_BACKEND_API;
+      const backendUrl = import.meta.env.VITE_BACKEND_KNOWLEDGEBASE_API;
       const companyId = getCompanyId();
       if (!backendUrl) throw new Error('Backend API URL not configured');
       if (!companyId) throw new Error('Company ID not found');
-      
+
       const response = await fetch(`${backendUrl}/api/scripts/${scriptId}/refine`, {
         method: 'POST',
         headers: {
@@ -651,9 +655,9 @@ const ScriptGenerator: React.FC = () => {
       console.log('[SCRIPTS] Script part refined successfully:', data);
 
       // Update the script in the local state
-      setScripts(prevScripts => 
-        prevScripts.map(script => 
-          script._id === scriptId 
+      setScripts(prevScripts =>
+        prevScripts.map(script =>
+          script._id === scriptId
             ? data.data.fullScript
             : script
         )
@@ -676,23 +680,23 @@ const ScriptGenerator: React.FC = () => {
     try {
       // Si le texte est vide, utiliser un espace pour satisfaire la validation
       const replicaText = newContent.replica.trim() === '' ? ' ' : newContent.replica;
-      
+
       // Mettre à jour l'état avant la requête
       setProcessingSteps(prev => [...prev, stepIndex]);
-      
-      const backendUrl = import.meta.env.VITE_BACKEND_API;
+
+      const backendUrl = import.meta.env.VITE_BACKEND_KNOWLEDGEBASE_API;
       if (!backendUrl) throw new Error('Backend API URL not configured');
-      
+
       // Petit délai pour assurer que l'état est mis à jour
       await new Promise(resolve => setTimeout(resolve, 100));
-      
+
       const response = await fetch(`${backendUrl}/api/scripts/${scriptId}/content`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
-          stepIndex, 
+        body: JSON.stringify({
+          stepIndex,
           newContent: { replica: replicaText }
         }),
       });
@@ -705,9 +709,9 @@ const ScriptGenerator: React.FC = () => {
       console.log('[SCRIPTS] Script content updated successfully:', data);
 
       // Update the script in the local state
-      setScripts(prevScripts => 
-        prevScripts.map(script => 
-          script._id === scriptId 
+      setScripts(prevScripts =>
+        prevScripts.map(script =>
+          script._id === scriptId
             ? data.data.fullScript
             : script
         )
@@ -729,9 +733,9 @@ const ScriptGenerator: React.FC = () => {
   // Add new handlers for replica management
   const handleAddReplica = async (scriptId: string, phase: string, actor: string) => {
     try {
-      const backendUrl = import.meta.env.VITE_BACKEND_API;
+      const backendUrl = import.meta.env.VITE_BACKEND_KNOWLEDGEBASE_API;
       if (!backendUrl) throw new Error('Backend API URL not configured');
-      
+
       // Find the index where to insert the new replica
       const phaseSteps = selectedScript?.script.filter(s => s.phase === phase) || [];
       const lastPhaseStepIndex = selectedScript?.script.findIndex(s => s.phase === phase && s.replica === phaseSteps[phaseSteps.length - 1].replica);
@@ -743,7 +747,7 @@ const ScriptGenerator: React.FC = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           phase,
           actor,
           insertIndex
@@ -755,11 +759,11 @@ const ScriptGenerator: React.FC = () => {
       }
 
       const data = await response.json();
-      
+
       // Update local state
-      setScripts(prevScripts => 
-        prevScripts.map(script => 
-          script._id === scriptId 
+      setScripts(prevScripts =>
+        prevScripts.map(script =>
+          script._id === scriptId
             ? data.data.fullScript
             : script
         )
@@ -770,7 +774,7 @@ const ScriptGenerator: React.FC = () => {
       }
 
       // Start editing the new replica immediately
-      setEditingStep({ 
+      setEditingStep({
         index: data.data.insertedIndex,
         text: '' // Start with empty text in the editor
       });
@@ -787,9 +791,9 @@ const ScriptGenerator: React.FC = () => {
     }
 
     try {
-      const backendUrl = import.meta.env.VITE_BACKEND_API;
+      const backendUrl = import.meta.env.VITE_BACKEND_KNOWLEDGEBASE_API;
       if (!backendUrl) throw new Error('Backend API URL not configured');
-      
+
       // Use the new dedicated endpoint
       const response = await fetch(`${backendUrl}/api/scripts/${scriptId}/replicas/${stepIndex}`, {
         method: 'DELETE',
@@ -803,11 +807,11 @@ const ScriptGenerator: React.FC = () => {
       }
 
       const data = await response.json();
-      
+
       // Update local state
-      setScripts(prevScripts => 
-        prevScripts.map(script => 
-          script._id === scriptId 
+      setScripts(prevScripts =>
+        prevScripts.map(script =>
+          script._id === scriptId
             ? data.data.fullScript
             : script
         )
@@ -880,13 +884,13 @@ const ScriptGenerator: React.FC = () => {
             <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-blue-50">
               <div className="flex items-center justify-between">
                 <div>
-              <h3 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
-                <Target className="w-6 h-6 text-blue-600" />
-                Your Generated Scripts
-              </h3>
-              <p className="text-gray-600 text-sm mt-1">Manage and view all your call scripts</p>
+                  <h3 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
+                    <Target className="w-6 h-6 text-blue-600" />
+                    Your Generated Scripts
+                  </h3>
+                  <p className="text-gray-600 text-sm mt-1">Manage and view all your call scripts</p>
                 </div>
-                
+
                 {/* Status Filter */}
                 <div className="flex items-center gap-2">
                   <Filter className="w-4 h-4 text-gray-500" />
@@ -902,7 +906,7 @@ const ScriptGenerator: React.FC = () => {
                 </div>
               </div>
             </div>
-            
+
             {isLoadingScripts ? (
               <div className="p-12 text-center">
                 <div className="inline-flex items-center gap-3 text-gray-600">
@@ -929,18 +933,18 @@ const ScriptGenerator: React.FC = () => {
                 <div className="p-4 bg-gray-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
                   <Headphones className="w-8 h-8 text-gray-400" />
                 </div>
-                
+
                 {/* Different messages based on the current filter */}
                 {statusFilter === 'all' ? (
                   <>
-                <h4 className="text-lg font-medium text-gray-700 mb-2">No scripts yet</h4>
-                <p className="text-gray-500 mb-6">Create your first call script to get started</p>
-                <button
-                  className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2 font-medium mx-auto"
-                  onClick={handleShowFormClick}
-                >
-                  <Plus className="w-5 h-5" />
-                  Generate Your First Script
+                    <h4 className="text-lg font-medium text-gray-700 mb-2">No scripts yet</h4>
+                    <p className="text-gray-500 mb-6">Create your first call script to get started</p>
+                    <button
+                      className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2 font-medium mx-auto"
+                      onClick={handleShowFormClick}
+                    >
+                      <Plus className="w-5 h-5" />
+                      Generate Your First Script
                     </button>
                   </>
                 ) : statusFilter === 'active' ? (
@@ -961,7 +965,7 @@ const ScriptGenerator: React.FC = () => {
                       >
                         <Filter className="w-5 h-5" />
                         View All Scripts
-                </button>
+                      </button>
                     </div>
                   </>
                 ) : (
@@ -1038,14 +1042,12 @@ const ScriptGenerator: React.FC = () => {
                           </td>
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-2">
-                              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                                script.isActive 
-                                  ? 'bg-green-100 text-green-800' 
+                              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${script.isActive
+                                  ? 'bg-green-100 text-green-800'
                                   : 'bg-gray-100 text-gray-800'
-                              }`}>
-                                <div className={`w-2 h-2 rounded-full mr-1 ${
-                                  script.isActive ? 'bg-green-500' : 'bg-gray-500'
-                                }`}></div>
+                                }`}>
+                                <div className={`w-2 h-2 rounded-full mr-1 ${script.isActive ? 'bg-green-500' : 'bg-gray-500'
+                                  }`}></div>
                                 {script.isActive ? 'Active' : 'Inactive'}
                               </span>
                             </div>
@@ -1067,11 +1069,10 @@ const ScriptGenerator: React.FC = () => {
                                 View
                               </button>
                               <button
-                                className={`inline-flex items-center gap-1 px-3 py-2 rounded-lg transition-all duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed ${
-                                  script.isActive
+                                className={`inline-flex items-center gap-1 px-3 py-2 rounded-lg transition-all duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed ${script.isActive
                                     ? 'text-orange-600 hover:text-orange-800 hover:bg-orange-50'
                                     : 'text-green-600 hover:text-green-800 hover:bg-green-50'
-                                }`}
+                                  }`}
                                 onClick={() => handleUpdateScriptStatus(script._id, !script.isActive)}
                                 disabled={updatingScriptId === script._id}
                                 title={script.isActive ? 'Deactivate script' : 'Activate script'}
@@ -1083,10 +1084,10 @@ const ScriptGenerator: React.FC = () => {
                                 ) : (
                                   <ToggleLeft className="w-4 h-4" />
                                 )}
-                                {updatingScriptId === script._id 
-                                  ? 'Updating...' 
-                                  : script.isActive 
-                                    ? 'Deactivate' 
+                                {updatingScriptId === script._id
+                                  ? 'Updating...'
+                                  : script.isActive
+                                    ? 'Deactivate'
                                     : 'Activate'
                                 }
                               </button>
@@ -1120,21 +1121,21 @@ const ScriptGenerator: React.FC = () => {
           <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden animate-fade-in">
             <div className="p-6 bg-gradient-to-r from-blue-600 to-purple-600 text-white">
               <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-white/20 rounded-xl">
-                  <Headphones className="w-8 h-8" />
-                </div>
-                <div>
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-white/20 rounded-xl">
+                    <Headphones className="w-8 h-8" />
+                  </div>
+                  <div>
                     <div className="flex items-center gap-3 mb-1">
-                  <h3 className="text-2xl font-bold">Call Script</h3>
+                      <h3 className="text-2xl font-bold">Call Script</h3>
                       <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-white/20 text-white border border-white/30">
                         Structured Call
                       </span>
-                </div>
+                    </div>
                     <p className="text-blue-100">Ready to use conversation guide with structured phases</p>
                   </div>
                 </div>
-                
+
                 {/* Add Regenerate button */}
                 <button
                   onClick={() => handleRegenerateScript(selectedScript._id)}
@@ -1155,7 +1156,7 @@ const ScriptGenerator: React.FC = () => {
                 </button>
               </div>
             </div>
-            
+
             <div className="p-6 border-b border-gray-100 bg-gray-50">
               <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                 <div className="flex items-center gap-2">
@@ -1225,7 +1226,7 @@ const ScriptGenerator: React.FC = () => {
                   groupScriptByPhase(selectedScript.script).map((phaseGroup, phaseIdx) => {
                     const phaseConfig = getPhaseConfig(phaseGroup.phaseName);
                     const PhaseIcon = phaseConfig.icon;
-                    
+
                     return (
                       <div key={phaseIdx} className="relative">
                         {/* Phase Header */}
@@ -1244,7 +1245,7 @@ const ScriptGenerator: React.FC = () => {
                                 </p>
                               </div>
                             </div>
-                            
+
                             {/* Add Replica Buttons */}
                             <div className="flex items-center gap-2">
                               <button
@@ -1268,52 +1269,52 @@ const ScriptGenerator: React.FC = () => {
                         {/* Phase Steps with edit options */}
                         <div className="space-y-4 ml-4 border-l-2 border-gray-200 pl-6 relative">
                           {phaseGroup.steps.map((step, stepIdx) => {
-                            const globalStepIdx = selectedScript.script.findIndex(s => 
+                            const globalStepIdx = selectedScript.script.findIndex(s =>
                               s.phase === step.phase && s.actor === step.actor && s.replica === step.replica
                             );
-                            
+
                             return (
                               <div key={stepIdx} className="flex items-start gap-4 group relative">
                                 {/* Connection line dot */}
                                 <div className={`absolute -left-7 top-4 w-3 h-3 rounded-full border-2 border-white shadow-sm ${phaseConfig.bgColor} ${phaseConfig.borderColor}`}></div>
-                                
+
                                 <div className="flex-shrink-0">
-                        {step.actor === 'agent' ? (
-                          <div className="p-3 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl shadow-lg">
-                            <Headphones className="w-5 h-5 text-white" />
-                          </div>
-                        ) : (
-                          <div className="p-3 bg-gradient-to-r from-green-500 to-green-600 rounded-xl shadow-lg">
-                            <User className="w-5 h-5 text-white" />
-                          </div>
-                        )}
-                      </div>
-                                
-                      <div className="flex-1 min-w-0">
-                        <div className={
-                          'rounded-2xl px-6 py-4 shadow-md border-l-4 transition-all duration-200 group-hover:shadow-lg ' +
-                          (step.actor === 'agent'
-                            ? 'bg-gradient-to-r from-blue-50 to-blue-100 border-blue-500 text-blue-900'
-                            : 'bg-gradient-to-r from-green-50 to-green-100 border-green-500 text-green-900')
-                        }>
-                          <div className="flex flex-col gap-2">
-                            <span className="font-bold text-sm uppercase tracking-wide opacity-75">
-                              {step.actor === 'agent' ? 'Agent' : 'Lead'}:
-                            </span>
-                            <div className="min-h-[24px]"> {/* Hauteur minimale pour éviter les sauts */}
-                              {processingSteps.includes(globalStepIdx) ? (
-                                <div className="flex items-center gap-3">
-                                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-current"></div>
-                                  <span className="text-sm font-medium">Updating response...</span>
+                                  {step.actor === 'agent' ? (
+                                    <div className="p-3 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl shadow-lg">
+                                      <Headphones className="w-5 h-5 text-white" />
+                                    </div>
+                                  ) : (
+                                    <div className="p-3 bg-gradient-to-r from-green-500 to-green-600 rounded-xl shadow-lg">
+                                      <User className="w-5 h-5 text-white" />
+                                    </div>
+                                  )}
                                 </div>
-                              ) : (
-                                <p className="leading-relaxed whitespace-pre-wrap">{step.replica}</p>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                                
+
+                                <div className="flex-1 min-w-0">
+                                  <div className={
+                                    'rounded-2xl px-6 py-4 shadow-md border-l-4 transition-all duration-200 group-hover:shadow-lg ' +
+                                    (step.actor === 'agent'
+                                      ? 'bg-gradient-to-r from-blue-50 to-blue-100 border-blue-500 text-blue-900'
+                                      : 'bg-gradient-to-r from-green-50 to-green-100 border-green-500 text-green-900')
+                                  }>
+                                    <div className="flex flex-col gap-2">
+                                      <span className="font-bold text-sm uppercase tracking-wide opacity-75">
+                                        {step.actor === 'agent' ? 'Agent' : 'Lead'}:
+                                      </span>
+                                      <div className="min-h-[24px]"> {/* Hauteur minimale pour éviter les sauts */}
+                                        {processingSteps.includes(globalStepIdx) ? (
+                                          <div className="flex items-center gap-3">
+                                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-current"></div>
+                                            <span className="text-sm font-medium">Updating response...</span>
+                                          </div>
+                                        ) : (
+                                          <p className="leading-relaxed whitespace-pre-wrap">{step.replica}</p>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+
                                 {/* Edit options */}
                                 <div className="absolute right-0 top-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2">
                                   {/* Delete button */}
@@ -1324,7 +1325,7 @@ const ScriptGenerator: React.FC = () => {
                                   >
                                     <Trash2 className="w-4 h-4" />
                                   </button>
-                                  
+
                                   {/* Direct edit */}
                                   <button
                                     onClick={() => setEditingStep({ index: globalStepIdx, text: step.replica })}
@@ -1333,7 +1334,7 @@ const ScriptGenerator: React.FC = () => {
                                   >
                                     <Edit2 className="w-4 h-4" />
                                   </button>
-                                  
+
                                   {/* Refine with prompt */}
                                   <button
                                     onClick={() => setRefiningStep({ index: globalStepIdx, prompt: '' })}
@@ -1342,7 +1343,7 @@ const ScriptGenerator: React.FC = () => {
                                   >
                                     <MessageSquare className="w-4 h-4" />
                                   </button>
-                    </div>
+                                </div>
 
                                 {/* Edit modal */}
                                 {editingStep?.index === globalStepIdx && (
@@ -1457,7 +1458,7 @@ const ScriptGenerator: React.FC = () => {
                   Structured Call Script
                 </h4>
                 <p className="text-purple-700 mb-4">Your script will be generated following a proven methodology with these key phases:</p>
-                
+
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   {REPS_PHASES.map((phase, idx) => {
                     const PhaseIcon = phase.icon;
