@@ -40,38 +40,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const checkAuthStatus = useCallback(() => {
     const userId = Cookies.get('userId');
     const companyId = Cookies.get('companyId');
-
-    // Also check localStorage for Qiankun-provided auth data
-    const qiankunUserId = localStorage.getItem('userId');
-    const qiankunCompanyId = localStorage.getItem('companyId');
-
+    
     // Check for required cookies based on run mode
     const runMode = import.meta.env.VITE_RUN_MODE;
     let isAuth = false;
-
+    
     if (runMode === 'standalone') {
       // En mode standalone, on considère l'utilisateur comme authentifié
       isAuth = true;
     } else {
-      // En mode in-app, vérifier les cookies OU localStorage (pour Qiankun cross-domain)
-      isAuth = !!(userId && companyId) || !!(qiankunUserId && qiankunCompanyId);
+      // En mode in-app, vérifier les cookies
+      isAuth = !!(userId && companyId);
     }
 
     // Seulement mettre à jour si l'état a changé
     if (isAuthenticated !== isAuth) {
-      console.log('Auth status changed:', {
-        cookieUserId: !!userId,
-        cookieCompanyId: !!companyId,
-        lsUserId: !!qiankunUserId,
-        lsCompanyId: !!qiankunCompanyId,
-        runMode
-      });
+      console.log('Auth status changed:', { userId: !!userId, companyId: !!companyId, runMode });
       setIsAuthenticated(isAuth);
       if (isAuth) {
-        setUser({
-          userId: userId || qiankunUserId || null,
-          companyId: companyId || qiankunCompanyId || null
-        });
+        setUser({ userId: userId || null, companyId: companyId || null });
       } else {
         setUser(null);
       }
@@ -83,10 +70,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Fonction de logout sécurisée
   const logout = () => {
     console.log('Performing secure logout...');
-
+    
     // 1. Nettoyer le localStorage
     localStorage.clear();
-
+    
     // 2. Nettoyer tous les cookies
     const cookies = Cookies.get();
     Object.keys(cookies).forEach(cookieName => {
@@ -94,14 +81,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Essayer aussi de supprimer avec différents domaines si nécessaire
       Cookies.remove(cookieName, { path: '/', domain: window.location.hostname });
     });
-
+    
     // 3. Nettoyer l'état local
     setIsAuthenticated(false);
     setUser(null);
-
+    
     // 4. Construire l'URL complète pour rediriger vers l'app principale
     const mainAppUrl = getMainAppUrl();
-
+    
     // 5. Redirection immédiate vers l'application principale pour éviter les redirections multiples
     window.location.replace(mainAppUrl);
   };
@@ -111,35 +98,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(true);
     const userId = Cookies.get('userId');
     const companyId = Cookies.get('companyId');
-    const qiankunUserId = localStorage.getItem('userId');
-    const qiankunCompanyId = localStorage.getItem('companyId');
     const runMode = import.meta.env.VITE_RUN_MODE;
-
-    console.log('Initial auth check:', {
-      cookieUserId: !!userId,
-      cookieCompanyId: !!companyId,
-      lsUserId: !!qiankunUserId,
-      lsCompanyId: !!qiankunCompanyId,
-      runMode
-    });
-
+    
+    console.log('Initial auth check:', { userId: !!userId, companyId: !!companyId, runMode });
+    
     let isAuth = false;
     if (runMode === 'standalone') {
       isAuth = true;
     } else {
-      isAuth = !!(userId && companyId) || !!(qiankunUserId && qiankunCompanyId);
+      isAuth = !!(userId && companyId);
     }
-
+    
     setIsAuthenticated(isAuth);
     if (isAuth) {
-      setUser({
-        userId: userId || qiankunUserId || null,
-        companyId: companyId || qiankunCompanyId || null
-      });
+      setUser({ userId: userId || null, companyId: companyId || null });
     } else {
       setUser(null);
     }
-
+    
     setIsLoading(false);
   }, []);
 
@@ -148,7 +124,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const handleStorageChange = (e: StorageEvent) => {
       // En mode standalone, ne pas gérer les changements de storage
       if (import.meta.env.VITE_RUN_MODE === 'standalone') return;
-
+      
       if ((e.key === 'userId' || e.key === 'companyId') && !e.newValue && isAuthenticated) {
         // Cookie/token supprimé dans un autre onglet - logout direct
         console.log('Auth data removed in another tab, logging out...');
